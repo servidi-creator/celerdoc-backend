@@ -1,0 +1,12 @@
+{
+    "CO": {
+        "pais": "Colombia",
+        "moneda": "COP",
+        "tarifa_mercado": 6000
+    },
+    "DEFAULT": {
+        "pais": "Internacional",
+        "moneda": "USD",
+        "tarifa_mercado": 3.5
+    }
+}

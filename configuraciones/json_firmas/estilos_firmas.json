@@ -1,0 +1,6 @@
+{
+    "tradicional": {
+        "descripcion": "Trazo y SHA256",
+        "incluye_sha256": true
+    }
+}

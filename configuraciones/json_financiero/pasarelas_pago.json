@@ -1,0 +1,10 @@
+{
+    "pasarelas_disponibles": {
+        "paypal": {
+            "nombre": "PayPal",
+            "activo": true,
+            "es_principal": true,
+            "cuenta_o_identificador": "servidi@gmail.com"
+        }
+    }
+}

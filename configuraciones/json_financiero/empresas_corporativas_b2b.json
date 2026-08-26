@@ -1,0 +1,10 @@
+{
+    "empresas_registradas": {
+        "empresa_demo_sas": {
+            "razon_social": "Soluciones Legales S.A.S.",
+            "nit": "900123456-1",
+            "api_key_corporativa": "celerdoc_live_sec_demo900123456",
+            "activo": true
+        }
+    }
+}

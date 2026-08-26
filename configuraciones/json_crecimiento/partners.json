@@ -1,0 +1,7 @@
+{
+    "DEFAULT_PARTNER": {
+        "codigo_partner": "DIRECTO",
+        "costo_preferencial_partner_porcentaje": 100.0,
+        "activo": true
+    }
+}

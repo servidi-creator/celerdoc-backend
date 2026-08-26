@@ -1,0 +1,6 @@
+{
+    "prioridad_1": {
+        "accion": "firmar_documento",
+        "descripcion": "Firmar documento rápido"
+    }
+}

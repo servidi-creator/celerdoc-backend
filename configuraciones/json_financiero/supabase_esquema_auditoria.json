@@ -1,0 +1,11 @@
+{
+    "supabase_tablas_auditoria": {
+        "tabla_auditoria_documentos": {
+            "columnas": [
+                "id",
+                "sha256",
+                "timestamp"
+            ]
+        }
+    }
+}
