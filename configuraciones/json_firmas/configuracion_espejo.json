@@ -1,0 +1,11 @@
+{
+  "resolucion_dpi": 150,
+  "formato_salida": "png",
+  "pagina_defecto": "ultima",
+  "limite_firmas_por_pagina": 4,
+  "parametros_retorno": {
+    "incluir_dimensiones": true,
+    "incluir_total_paginas": true,
+    "incluir_base64": true
+  }
+}

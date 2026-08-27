@@ -1,13 +1,19 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-import urllib.request
 import os
+import json
+import base64
+import fitz  # PyMuPDF
 from datetime import datetime
-import hashlib
-import shutil
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-app = FastAPI(title="Celerdoc Master Backend", version="2.1")
+app = FastAPI(
+    title="Celerdoc API - Motor de Firma Electrónica",
+    description="Backend de procesamiento y sellado seguro de documentos PDF",
+    version="2.0.0"
+)
 
+# Habilitar CORS para permitir peticiones desde Wix y cualquier origen seguro
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,92 +22,86 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-CARPETA_ORIGINALES = "respaldos_originales"
-CARPETA_FIRMADOS = "documentos_firmados"
-os.makedirs(CARPETA_ORIGINALES, exist_ok=True)
-os.makedirs(CARPETA_FIRMADOS, exist_ok=True)
+# Ruta del archivo de configuración del espejo
+RUTA_CONFIG_ESPEJO = os.path.join("configuraciones", "json_firmas", "configuracion_espejo.json")
 
-MAPEO_TIPO_DOC = {
-    "Cédula de Ciudadanía": "CC",
-    "Cédula de Extranjería": "CE",
-    "NIT": "NIT",
-    "Pasaporte": "PP"
-}
-
-OTP_SIMULADO_PRUEBAS = "123456"
 
 @app.get("/")
-def mostrar_vitrina():
-    orig = os.listdir(CARPETA_ORIGINALES) if os.path.exists(CARPETA_ORIGINALES) else []
-    firm = os.listdir(CARPETA_FIRMADOS) if os.path.exists(CARPETA_FIRMADOS) else []
+def ruta_raiz():
     return {
-        "estado": "ok", 
-        "mensaje": "Master Backend de Celerdoc v2.1 operando",
-        "respaldos_originales": orig,
-        "documentos_firmados": firm
+        "sistema": "Celerdoc API",
+        "estado": "Operativo",
+        "fecha_servidor": datetime.utcnow().isoformat()
     }
 
-@app.post("/api/v1/firmas/procesar-master-integral")
-async def procesar_master_integral(request: Request):
+
+@app.post("/obtener-espejo")
+async def obtener_espejo(
+    archivo: UploadFile = File(...),
+    numero_pagina: int = Form(default=-1)
+):
+    """
+    Extrae quirúrgicamente una página específica (o la última por defecto)
+    del PDF original y la convierte a una imagen en Base64 para el visor espejo.
+    """
     try:
-        datos_wix = await request.json()
-        submissions = datos_wix.get('data', {}).get('submissions', [])
-        campos = {item['label']: item['value'] for item in submissions}
-        
-        nombre = campos.get('nombre', 'SinNombre')
-        apellido = campos.get('apellido', 'SinApellido')
-        email_usuario = campos.get('email_usuario', 'SinCorreo')
-        tipo_doc_largo = campos.get('tipo_documento', 'CC')
-        numero_doc = campos.get('numero_documento', '000000')
-        url_pdf = campos.get('archivo_pdf', '')
-        
-        acepta_terminos = campos.get('terminos_condiciones', False)
-        codigo_otp_ingresado = campos.get('codigo_otp', '')
-        
-        if not acepta_terminos or str(acepta_terminos).lower() in ['false', '0', 'no']:
-            return {
-                "estado": "error", 
-                "mensaje": "Debe aceptar obligatoriamente los Términos y Condiciones para continuar con la firma."
-            }
-            
-        if codigo_otp_ingresado != OTP_SIMULADO_PRUEBAS:
-            return {
-                "estado": "error", 
-                "mensaje": "Código OTP inválido o incorrecto. Verifique el código de 6 dígitos."
-            }
-            
-        if not url_pdf:
-            return {"estado": "error", "mensaje": "Wix no envió ningún enlace al PDF."}
-            
-        tipo_doc = MAPEO_TIPO_DOC.get(tipo_doc_largo, tipo_doc_largo.upper()[:3])
-        
-        timestamp_str = datetime.now().strftime('%Y%m%d_%H-%M-%S')
-        nombre_original_archivo = f"documento_{timestamp_str}.pdf"
-        ruta_original = os.path.join(CARPETA_ORIGINALES, nombre_original_archivo)
-        
-        urllib.request.urlretrieve(url_pdf, ruta_original)
-        
-        sha256_hash = hashlib.sha256()
-        with open(ruta_original, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        hash_original = sha256_hash.hexdigest()
-        
-        nombre_final = f"COMODATO_{tipo_doc}_{numero_doc}_{timestamp_str}.pdf"
-        ruta_final = os.path.join(CARPETA_FIRMADOS, nombre_final)
-        
-        shutil.copyfile(ruta_original, ruta_final)
-        
+        # Cargar configuración si existe, o usar valores seguros por defecto
+        resolucion_dpi = 150
+        formato_img = "png"
+        if os.path.exists(RUTA_CONFIG_ESPEJO):
+            with open(RUTA_CONFIG_ESPEJO, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                resolucion_dpi = config.get("resolucion_dpi", 150)
+                formato_img = config.get("formato_salida", "png")
+
+        # Leer el documento PDF en memoria
+        contenido_bytes = await archivo.read()
+        if not contenido_bytes:
+            raise HTTPException(status_code=400, detail="El archivo enviado está vacío.")
+
+        doc = fitz.open(stream=contenido_bytes, filetype="pdf")
+        total_paginas = len(doc)
+
+        if total_paginas == 0:
+            raise HTTPException(status_code=400, detail="El PDF no contiene páginas válidas.")
+
+        # Si el número de página es -1 o superior al total, selecciona la última hoja
+        if numero_pagina == -1 or numero_pagina > total_paginas:
+            indice_pagina = total_paginas - 1
+        else:
+            indice_pagina = max(0, numero_pagina - 1)
+
+        pagina = doc.load_page(indice_pagina)
+
+        # Renderizar la página como imagen
+        pix = pagina.get_pixmap(dpi=resolucion_dpi)
+        imagen_bytes = pix.tobytes(formato_img)
+        imagen_base64 = base64.b64encode(imagen_bytes).decode("utf-8")
+
+        # Dimensiones originales en puntos de PDF
+        rect = pagina.rect
+
+        doc.close()
+
         return {
-            "estado": "exitoso",
-            "mensaje": "¡Candados superados con éxito! Documento procesado, validado por OTP y archivado de forma segura.",
-            "firmante": f"{nombre} {apellido}",
-            "usuario": email_usuario,
-            "documento_original": nombre_original_archivo,
-            "documento_firmado": nombre_final,
-            "sha256_original": hash_original,
-            "timestamp": str(datetime.now())
+            "status": "success",
+            "total_paginas": total_paginas,
+            "pagina_actual": indice_pagina + 1,
+            "dimensiones": {
+                "ancho": rect.width,
+                "alto": rect.height
+            },
+            "espejo_base64": f"data:image/{formato_img};base64,{imagen_base64}"
         }
-        
+
     except Exception as e:
-        return {"estado": "error", "detalle": str(e)}
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "mensaje": f"Error al generar espejo: {str(e)}"}
+        )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    puerto = int(os.environ.get("PORT", 8000))
+    uvicorn.run("index:app", host="0.0.0.0", port=puerto, reload=True)
