@@ -1,0 +1,27 @@
+{
+  "titulo": "Celerdoc — Firmar Documento",
+  "desc": "Cargue su documento original, ubique el punto de firma en espejo, verifique identidad mediante OTP y obtenga su documento certificado con trazabilidad legal inalterable.",
+  "lblTipoDoc": "Tipo de Documento de Identidad",
+  "lblNumDoc": "Número de Documento / Identificador",
+  "lblEmail": "Correo Electrónico Corporativo",
+  "lblIndicativo": "País / Indicativo Telefónico",
+  "lblWhatsapp": "Número de Celular / WhatsApp",
+  "dropText": "Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF",
+  "lblMetaOriginal": "Documento Original:",
+  "lblMetaTimestamp": "Fecha y Hora de Carga (UTC):",
+  "lblMetaPaginas": "Total de Páginas Originales:",
+  "lblPagFirma": "Página seleccionada para estampar la firma:",
+  "btnFirmar": "Validar Código OTP y Firmar",
+  "otpTitulo": "Verificación de Identidad por OTP",
+  "btnConfirmarOtp": "Confirmar y Generar Documento Certificado",
+  "btnCancelarOtp": "Cancelar",
+  "btnDescargar": "Descargar Documento Firmado y Auditado",
+  "docTipos": {
+    "NAT": "Cédula de Ciudadanía / DNI / ID",
+    "EXT": "Cédula de Extranjería",
+    "TAX": "Identificación Tributaria (NIT / RUT / RFC / Tax ID / EIN)",
+    "PAS": "Pasaporte",
+    "PER": "Permiso Especial / Visa de Trabajo",
+    "OTH": "Otro (ej: Tarjeta de Identidad, etc.)"
+  }
+}

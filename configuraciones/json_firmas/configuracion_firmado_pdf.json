@@ -1,0 +1,19 @@
+{
+  "bloque_firma": {
+    "ancho": 220,
+    "alto": 110,
+    "margen_derecho": 40,
+    "margen_inferior": 50,
+    "posicion_por_defecto": {
+      "pagina": -1,
+      "x": 340,
+      "y": 70
+    },
+    "distribucion_capas": {
+      "offset_y_trazo": 0,
+      "offset_y_nombres": -68,
+      "offset_y_identificacion": -82,
+      "offset_y_codigo": -94
+    }
+  }
+}

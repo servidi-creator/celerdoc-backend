@@ -1,6 +1,30 @@
 {
-    "tradicional": {
-        "descripcion": "Trazo y SHA256",
-        "incluye_sha256": true
+  "estilo_bloque_principal": {
+    "fuente_principal": "Helvetica",
+    "capas": {
+      "zona_trazo": {
+        "alto_contenedor": 60,
+        "margen_inferior": 8
+      },
+      "nombres_apellidos": {
+        "tamano_fuente": 10,
+        "negrita": true,
+        "color": "#111111",
+        "interlineado": 12
+      },
+      "identificacion": {
+        "tamano_fuente": 9,
+        "negrita": false,
+        "color": "#333333",
+        "interlineado": 11
+      },
+      "codigo_verificacion": {
+        "tamano_fuente": 5,
+        "negrita": false,
+        "color": "#666666",
+        "interlineado": 7,
+        "formato": "HASH-SHA256-{id_transaccion}"
+      }
     }
+  }
 }

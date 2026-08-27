@@ -1,19 +1,17 @@
 import os
-import json
 import base64
-import fitz  # PyMuPDF
 from datetime import datetime
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 
-app = FastAPI(
-    title="Celerdoc API - Motor de Firma Electrónica",
-    description="Backend de procesamiento y sellado seguro de documentos PDF",
-    version="2.0.0"
-)
+from sello_criptografico import procesar_firma_completa, calcular_sha256
 
-# Habilitar CORS para permitir peticiones desde Wix y cualquier origen seguro
+app = FastAPI(title="Celerdoc API - Sistema de Firma y Auditoría")
+
+# Habilitar CORS para permitir peticiones desde el frontend local o remoto
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,86 +20,94 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ruta del archivo de configuración del espejo
-RUTA_CONFIG_ESPEJO = os.path.join("configuraciones", "json_firmas", "configuracion_espejo.json")
+# Carpetas de almacenamiento
+CARPETA_ORIGINALES = "documentos_originales"
+CARPETA_FIRMADOS = "respaldos_auditados"
 
+os.makedirs(CARPETA_ORIGINALES, exist_ok=True)
+os.makedirs(CARPETA_FIRMADOS, exist_ok=True)
+
+class DocumentoPayload(BaseModel):
+    nombre_archivo: str
+    archivo_base64: str
+    tipo_documento: str
+    numero_documento: str
+    total_firmantes: Optional[int] = 1
+    pagina_seleccionada: Optional[int] = 1
+    coordenadas: Optional[Dict[str, float]] = {"x_pct": 50.0, "y_pct": 80.0}
+    email_notificacion: Optional[str] = None
+    whatsapp_notificacion: Optional[str] = None
 
 @app.get("/")
-def ruta_raiz():
-    return {
-        "sistema": "Celerdoc API",
-        "estado": "Operativo",
-        "fecha_servidor": datetime.utcnow().isoformat()
-    }
+def estado_api():
+    return {"estado": "activo", "servicio": "Celerdoc Engine", "version": "2.0"}
 
-
-@app.post("/obtener-espejo")
-async def obtener_espejo(
-    archivo: UploadFile = File(...),
-    numero_pagina: int = Form(default=-1)
-):
-    """
-    Extrae quirúrgicamente una página específica (o la última por defecto)
-    del PDF original y la convierte a una imagen en Base64 para el visor espejo.
-    """
+@app.post("/procesar-firma")
+def api_procesar_firma(payload: DocumentoPayload):
     try:
-        # Cargar configuración si existe, o usar valores seguros por defecto
-        resolucion_dpi = 150
-        formato_img = "png"
-        if os.path.exists(RUTA_CONFIG_ESPEJO):
-            with open(RUTA_CONFIG_ESPEJO, "r", encoding="utf-8") as f:
-                config = json.load(f)
-                resolucion_dpi = config.get("resolucion_dpi", 150)
-                formato_img = config.get("formato_salida", "png")
+        # 1. Decodificar el archivo binario enviado por el usuario
+        pdf_bytes = base64.b64decode(payload.archivo_base64)
+        
+        # 2. Guardar el PDF original intacto en la carpeta de originales
+        ruta_guardado_original = os.path.join(CARPETA_ORIGINALES, payload.nombre_archivo)
+        with open(ruta_guardado_original, "wb") as f:
+            f.write(pdf_bytes)
+            
+        sha256_original = calcular_sha256(ruta_guardado_original)
 
-        # Leer el documento PDF en memoria
-        contenido_bytes = await archivo.read()
-        if not contenido_bytes:
-            raise HTTPException(status_code=400, detail="El archivo enviado está vacío.")
+        # 3. Construir la nomenclatura exacta del PDF final
+        nombre_base = os.path.splitext(payload.nombre_archivo)[0]
+        timestamp_sufijo = datetime.now().strftime("%Y%m%d%H%M%S")
+        nombre_final = f"{nombre_base}_{payload.tipo_documento}_{payload.numero_documento}_{timestamp_sufijo}.pdf"
+        ruta_guardado_final = os.path.join(CARPETA_FIRMADOS, nombre_final)
 
-        doc = fitz.open(stream=contenido_bytes, filetype="pdf")
-        total_paginas = len(doc)
+        # 4. Procesar sellado, desborde (1 a N páginas) y hoja de auditoría
+        datos_firmante = {
+            "tipo_documento": payload.tipo_documento,
+            "numero_documento": payload.numero_documento,
+            "total_firmantes": payload.total_firmantes,
+            "pagina_seleccionada": payload.pagina_seleccionada,
+            "coordenadas": payload.coordenadas,
+            "timestamp_carga_utc": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        }
 
-        if total_paginas == 0:
-            raise HTTPException(status_code=400, detail="El PDF no contiene páginas válidas.")
-
-        # Si el número de página es -1 o superior al total, selecciona la última hoja
-        if numero_pagina == -1 or numero_pagina > total_paginas:
-            indice_pagina = total_paginas - 1
-        else:
-            indice_pagina = max(0, numero_pagina - 1)
-
-        pagina = doc.load_page(indice_pagina)
-
-        # Renderizar la página como imagen
-        pix = pagina.get_pixmap(dpi=resolucion_dpi)
-        imagen_bytes = pix.tobytes(formato_img)
-        imagen_base64 = base64.b64encode(imagen_bytes).decode("utf-8")
-
-        # Dimensiones originales en puntos de PDF
-        rect = pagina.rect
-
-        doc.close()
+        resultado = procesar_firma_completa(
+            ruta_pdf_original=ruta_guardado_original,
+            datos_firmante=datos_firmante,
+            ruta_destino_final=ruta_guardado_final
+        )
 
         return {
-            "status": "success",
-            "total_paginas": total_paginas,
-            "pagina_actual": indice_pagina + 1,
-            "dimensiones": {
-                "ancho": rect.width,
-                "alto": rect.height
+            "exito": True,
+            "mensaje": "Documento firmado, sellado y auditado con total éxito.",
+            "datos_archivo": {
+                "nombre_original": payload.nombre_archivo,
+                "nombre_final": nombre_final,
+                "ruta_descarga": f"/descargar/{nombre_final}",
+                "ruta_servidor": ruta_guardado_final
             },
-            "espejo_base64": f"data:image/{formato_img};base64,{imagen_base64}"
+            "criptografia_trazabilidad": {
+                "sha256_original": resultado["sha256_original"],
+                "sha256_final": resultado["sha256_final"],
+                "codigo_validador": resultado["codigo_validador"],
+                "total_paginas_final": resultado["total_paginas_final"]
+            },
+            "notificaciones_programadas": {
+                "email": payload.email_notificacion,
+                "whatsapp": payload.whatsapp_notificacion
+            }
         }
 
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "mensaje": f"Error al generar espejo: {str(e)}"}
-        )
+        raise HTTPException(status_status=500, detail=str(e))
 
-
-if __name__ == "__main__":
-    import uvicorn
-    puerto = int(os.environ.get("PORT", 8000))
-    uvicorn.run("index:app", host="0.0.0.0", port=puerto, reload=True)
+@app.get("/descargar/{nombre_archivo}")
+def descargar_documento(nombre_archivo: str):
+    ruta_archivo = os.path.join(CARPETA_FIRMADOS, nombre_archivo)
+    if not os.path.exists(ruta_archivo):
+        raise HTTPException(status_code=404, detail="El archivo solicitado no existe.")
+    return FileResponse(
+        ruta_archivo,
+        media_type="application/pdf",
+        filename=nombre_archivo
+    )

@@ -1,12 +1,30 @@
 {
-    "CO": {
-        "pais": "Colombia",
-        "moneda": "COP",
-        "tarifa_mercado": 6000
-    },
-    "DEFAULT": {
-        "pais": "Internacional",
-        "moneda": "USD",
-        "tarifa_mercado": 3.5
-    }
+  "paises": [
+    { "codigo": "CO", "nombre": "Colombia", "bandera": "🇨🇴", "indicativo": "+57", "idioma_defecto": "es", "moneda": "COP", "simbolo_moneda": "$" },
+    { "codigo": "US", "nombre": "Estados Unidos", "bandera": "🇺🇸", "indicativo": "+1", "idioma_defecto": "en", "moneda": "USD", "simbolo_moneda": "$" },
+    { "codigo": "MX", "nombre": "México", "bandera": "🇲🇽", "indicativo": "+52", "idioma_defecto": "es", "moneda": "MXN", "simbolo_moneda": "$" },
+    { "codigo": "ES", "nombre": "España", "bandera": "🇪🇸", "indicativo": "+34", "idioma_defecto": "es", "moneda": "EUR", "simbolo_moneda": "€" },
+    { "codigo": "BR", "nombre": "Brasil", "bandera": "🇧🇷", "indicativo": "+55", "idioma_defecto": "pt", "moneda": "BRL", "simbolo_moneda": "R$" },
+    { "codigo": "AR", "nombre": "Argentina", "bandera": "🇦🇷", "indicativo": "+54", "idioma_defecto": "es", "moneda": "ARS", "simbolo_moneda": "$" },
+    { "codigo": "CL", "nombre": "Chile", "bandera": "🇨🇱", "indicativo": "+56", "idioma_defecto": "es", "moneda": "CLP", "simbolo_moneda": "$" },
+    { "codigo": "PE", "nombre": "Perú", "bandera": "🇵🇪", "indicativo": "+51", "idioma_defecto": "es", "moneda": "PEN", "simbolo_moneda": "S/" },
+    { "codigo": "GB", "nombre": "Reino Unido", "bandera": "🇬🇧", "indicativo": "+44", "idioma_defecto": "en", "moneda": "GBP", "simbolo_moneda": "£" },
+    { "codigo": "CA", "nombre": "Canadá", "bandera": "🇨🇦", "indicativo": "+1", "idioma_defecto": "en", "moneda": "CAD", "simbolo_moneda": "$" },
+    { "codigo": "DE", "nombre": "Alemania", "bandera": "🇩🇪", "indicativo": "+49", "idioma_defecto": "de", "moneda": "EUR", "simbolo_moneda": "€" },
+    { "codigo": "FR", "nombre": "Francia", "bandera": "🇫🇷", "indicativo": "+33", "idioma_defecto": "fr", "moneda": "EUR", "simbolo_moneda": "€" },
+    { "codigo": "IT", "nombre": "Italia", "bandera": "🇮🇹", "indicativo": "+39", "idioma_defecto": "it", "moneda": "EUR", "simbolo_moneda": "€" },
+    { "codigo": "JP", "nombre": "Japón", "bandera": "🇯🇵", "indicativo": "+81", "idioma_defecto": "ja", "moneda": "JPY", "simbolo_moneda": "¥" },
+    { "codigo": "CN", "nombre": "China", "bandera": "🇨🇳", "indicativo": "+86", "idioma_defecto": "zh", "moneda": "CNY", "simbolo_moneda": "¥" },
+    { "codigo": "PA", "nombre": "Panamá", "bandera": "🇵🇦", "indicativo": "+507", "idioma_defecto": "es", "moneda": "USD", "simbolo_moneda": "$" },
+    { "codigo": "EC", "nombre": "Ecuador", "bandera": "🇪🇨", "indicativo": "+593", "idioma_defecto": "es", "moneda": "USD", "simbolo_moneda": "$" },
+    { "codigo": "CR", "nombre": "Costa Rica", "bandera": "🇨🇷", "indicativo": "+506", "idioma_defecto": "es", "moneda": "CRC", "simbolo_moneda": "₡" },
+    { "codigo": "UY", "nombre": "Uruguay", "bandera": "🇺🇾", "indicativo": "+598", "idioma_defecto": "es", "moneda": "UYU", "simbolo_moneda": "$U" },
+    { "codigo": "AU", "nombre": "Australia", "bandera": "🇦🇺", "indicativo": "+61", "idioma_defecto": "en", "moneda": "AUD", "simbolo_moneda": "$" },
+    { "codigo": "GLOBAL", "nombre": "Global / Otros", "bandera": "🌐", "indicativo": "+0", "idioma_defecto": "en", "moneda": "USD", "simbolo_moneda": "$" }
+  ],
+  "configuracion_defecto": {
+    "pais_fallback": "US",
+    "idioma_fallback": "en",
+    "moneda_fallback": "USD"
+  }
 }

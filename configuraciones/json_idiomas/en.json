@@ -1,0 +1,27 @@
+{
+  "titulo": "Celerdoc — Sign Document",
+  "desc": "Upload your original document, place signature point on mirror view, verify identity via OTP and obtain your certified document with tamper-proof legal traceability.",
+  "lblTipoDoc": "Identity Document Type",
+  "lblNumDoc": "Document Number / Identifier",
+  "lblEmail": "Corporate Email Address",
+  "lblIndicativo": "Country / Dial Code",
+  "lblWhatsapp": "Mobile / WhatsApp Number",
+  "dropText": "Click, drag, or paste (Ctrl+V) your PDF file here",
+  "lblMetaOriginal": "Original Document:",
+  "lblMetaTimestamp": "Upload Date & Time (UTC):",
+  "lblMetaPaginas": "Total Original Pages:",
+  "lblPagFirma": "Selected page for signature stamping:",
+  "btnFirmar": "Validate OTP Code & Sign",
+  "otpTitulo": "Identity Verification via OTP",
+  "btnConfirmarOtp": "Confirm & Generate Certified Document",
+  "btnCancelarOtp": "Cancel",
+  "btnDescargar": "Download Signed & Audited Document",
+  "docTipos": {
+    "NAT": "National ID / DNI / ID",
+    "EXT": "Foreign ID Card",
+    "TAX": "Tax ID / Fiscal ID (NIT / RFC / Tax ID / EIN)",
+    "PAS": "Passport",
+    "PER": "Special Permit / Work Visa",
+    "OTH": "Other (e.g., Identity Card, etc.)"
+  }
+}

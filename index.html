@@ -1,74 +1,1132 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Celerdoc - Plataforma de Firma Electrónica y Trazabilidad</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f7fafc;
-            color: #2d3748;
-            margin: 0;
-            padding: 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 80vh;
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            max-width: 600px;
-            text-align: center;
-        }
-        h1 {
-            color: #1a365d;
-            margin-bottom: 10px;
-        }
-        p {
-            color: #4a5568;
-            line-height: 1.6;
-        }
-        .badge {
-            background-color: #c6f6d5;
-            color: #22543d;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-weight: bold;
-            display: inline-block;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        .btn {
-            background-color: #3182ce;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            margin-top: 20px;
-        }
-        .btn:hover {
-            background-color: #2b6cb0;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Celerdoc — Firmar Documento</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root[data-theme="light"] {
+      --bg-body: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-input: #ffffff;
+      --border-card: #cbd5e1;
+      --border-input: #94a3b8;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --text-label: #1e293b;
+      --brand-primary: #1e40af;
+      --brand-primary-hover: #1d4ed8;
+      --bg-subtle: #f1f5f9;
+      --border-subtle: #e2e8f0;
+      --viewer-bg: #e2e8f0;
+      --output-bg: #0f172a;
+      --output-text: #38bdf8;
+      --dropdown-bg: #ffffff;
+      --dropdown-hover: #f1f5f9;
+    }
+
+    :root[data-theme="dark"] {
+      --bg-body: #0b1120;
+      --bg-card: #1e293b;
+      --bg-input: #0f172a;
+      --border-card: #334155;
+      --border-input: #475569;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-label: #cbd5e1;
+      --brand-primary: #2563eb;
+      --brand-primary-hover: #3b82f6;
+      --bg-subtle: #0f172a;
+      --border-subtle: #334155;
+      --viewer-bg: #334155;
+      --output-bg: #050811;
+      --output-text: #7dd3fc;
+      --dropdown-bg: #1e293b;
+      --dropdown-hover: #334155;
+    }
+
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 24px 16px; display: flex; flex-direction: column; align-items: center; }
+    .container { width: 100%; max-width: 1050px; background-color: var(--bg-card); border: 1px solid var(--border-card); border-radius: 10px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
+
+    .top-controls { display: flex; justify-content: flex-end; align-items: center; background: var(--bg-subtle); border: 1px solid var(--border-subtle); padding: 10px 14px; border-radius: 8px; margin-bottom: 20px; gap: 10px; position: relative; }
+    .right-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    
+    .btn-control { background: var(--bg-card); border: 1.5px solid var(--border-input); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
+    .btn-control:hover, .btn-control.active { border-color: var(--brand-primary); background: var(--brand-primary); color: #ffffff; }
+    
+    .country-selector-wrap { position: relative; }
+    .country-dropdown { position: absolute; top: 110%; right: 0; background: var(--dropdown-bg); border: 1.5px solid var(--border-card); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); width: 300px; max-height: 400px; overflow-y: auto; display: none; z-index: 100; padding: 6px; }
+    .country-dropdown.open { display: block; }
+    .country-section-title { font-size: 11px; font-weight: 700; color: var(--text-muted); padding: 6px 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .country-item { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 5px; cursor: pointer; font-size: 13px; color: var(--text-main); }
+    .country-item:hover { background: var(--dropdown-hover); }
+    .country-item span.indicativo { color: var(--brand-primary); font-weight: 600; font-size: 12px; }
+    .btn-more-countries { width: 100%; border: none; background: var(--bg-subtle); color: var(--brand-primary); padding: 9px; border-radius: 5px; font-weight: 700; font-size: 12px; cursor: pointer; text-align: center; margin-top: 6px; }
+    .btn-more-countries:hover { background: var(--border-subtle); }
+
+    .theme-toggle-btn { background: var(--bg-card); border: 1.5px solid var(--border-input); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 12.5px; cursor: pointer; font-weight: 600; transition: all 0.2s ease; }
+    .theme-toggle-btn:hover { border-color: var(--brand-primary); }
+
+    h1 { margin: 0 0 6px 0; font-size: 22px; color: var(--brand-primary); font-weight: 700; }
+    p.desc { margin: 0 0 20px 0; color: var(--text-muted); font-size: 13px; line-height: 1.4; }
+
+    .form-grid { 
+      display: grid; 
+      grid-template-columns: 1.5fr 1.3fr 1.6fr 1.6fr; 
+      gap: 12px; 
+      margin-bottom: 20px; 
+      align-items: start;
+    }
+    
+    .form-group { display: flex; flex-direction: column; }
+    label { font-size: 12px; font-weight: 700; color: var(--text-label); height: 24px; display: flex; align-items: flex-end; margin-bottom: 6px; }
+    input[type="text"], input[type="email"], select { background-color: var(--bg-input); border: 1.5px solid var(--border-input); color: var(--text-main); padding: 9px 10px; border-radius: 6px; font-size: 13px; outline: none; width: 100%; height: 38px; }
+    input[type="text"]:focus, input[type="email"]:focus, select:focus { border-color: var(--brand-primary); }
+
+    .phone-input-wrap { display: flex; align-items: center; border: 1.5px solid var(--border-input); border-radius: 6px; background-color: var(--bg-input); height: 38px; overflow: hidden; }
+    .phone-input-wrap:focus-within { border-color: var(--brand-primary); }
+    .phone-prefix { background: var(--bg-subtle); padding: 0 10px; font-size: 13px; font-weight: 700; color: var(--brand-primary); border-right: 1.5px solid var(--border-input); height: 100%; display: flex; align-items: center; user-select: none; }
+    .phone-input-wrap input { border: none; height: 100%; border-radius: 0; padding-left: 8px; }
+
+    .dropzone { border: 2px dashed var(--border-input); border-radius: 8px; padding: 28px 16px; text-align: center; cursor: pointer; background: var(--bg-subtle); margin-bottom: 20px; outline: none; transition: all 0.2s ease; }
+    .dropzone:hover { border-color: var(--brand-primary); background: rgba(30, 64, 175, 0.04); }
+    .dropzone span { font-weight: 600; color: var(--text-muted); font-size: 13px; }
+    input[type="file"] { display: none; }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateY(10px); }
+      15% { opacity: 1; transform: translateY(0); }
+      85% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-10px); }
+    }
+
+    .toast-success {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+      color: #166534;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      z-index: 1000;
+      animation: fadeInOut 4s ease forwards;
+    }
+    .toast-success svg { width: 18px; height: 18px; fill: #166534; flex-shrink: 0; }
+
+    .throttle-banner {
+      background: #eff6ff;
+      border: 1.5px solid #bfdbfe;
+      color: #1e40af;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-meta { background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 14px; margin-bottom: 20px; font-size: 12.5px; }
+    .hidden-meta { display: none !important; }
+    .card-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    .card-row:last-child { margin-bottom: 0; }
+    .card-label { color: var(--text-muted); font-weight: 600; }
+    .card-val { color: var(--brand-primary); font-family: monospace; font-weight: 600; word-break: break-all; }
+
+    .nav-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; display: none; flex-wrap: wrap; gap: 10px; background: var(--bg-subtle); border: 1.5px solid var(--border-subtle); padding: 10px 14px; border-radius: 8px; }
+    
+    .toolbar-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .ux-btn { background: var(--bg-card); border: 1.5px solid var(--border-input); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease; }
+    .ux-btn:hover:not(:disabled) { border-color: var(--brand-primary); background: var(--brand-primary); color: #ffffff; }
+    .ux-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    
+    .divider { width: 1.5px; height: 24px; background: var(--border-input); margin: 0 4px; }
+    
+    .page-indicator { font-size: 12.5px; font-weight: 600; color: var(--text-label); display: flex; align-items: center; gap: 6px; background: var(--bg-card); padding: 4px 10px; border: 1.5px solid var(--border-input); border-radius: 6px; }
+    .pdf-page-input { width: 40px; text-align: center; background: var(--bg-input); border: 1.5px solid var(--border-input); color: var(--brand-primary); border-radius: 4px; padding: 2px; font-size: 12px; outline: none; font-weight: 700; }
+    .pdf-page-input:focus { border-color: var(--brand-primary); }
+
+    .btn-action { background: #15803d; color: #ffffff; border: none; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.2s ease; }
+    .btn-action:hover { background: #166534; }
+    .btn-action:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .btn-download-reader { background: var(--brand-primary); color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: none; align-items: center; gap: 6px; }
+    .btn-download-reader:hover { background: var(--brand-primary-hover); }
+
+    .viewer-box { position: relative; width: 100%; border: 1.5px solid var(--border-input); border-radius: 6px; overflow: auto; background: var(--viewer-bg); display: none; text-align: center; max-height: 75vh; padding: 16px; }
+    .pages-cascade-container { display: flex; flex-direction: column; align-items: center; gap: 24px; position: relative; }
+    .canvas-page-wrapper { position: relative; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.12); border-radius: 4px; overflow: hidden; background: #ffffff; }
+    .canvas-page-wrapper canvas { display: block; }
+    
+    .page-label-badge { position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.75); color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; z-index: 5; pointer-events: none; }
+
+    #markerFirma {
+      position: absolute;
+      width: 170px;
+      height: 65px;
+      border: 2px solid #16a34a;
+      background-color: rgba(22, 163, 74, 0.35);
+      border-radius: 4px;
+      transform: translate(-50%, -50%);
+      display: none;
+      cursor: grab;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-size: 11px;
+      color: #ffffff;
+      font-weight: 700;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+      z-index: 15;
+      user-select: none;
+      text-align: center;
+      padding: 4px;
+    }
+    #markerFirma:active { cursor: grabbing; }
+    .marker-watermark {
+      font-size: 8.5px;
+      font-weight: 400;
+      opacity: 0.75;
+      text-transform: lowercase;
+      letter-spacing: 0.2px;
+      margin-top: 2px;
+      text-shadow: none;
+      color: #f0fdf4;
+    }
+
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(3px);
+      display: none; justify-content: center; align-items: center; z-index: 999;
+    }
+    .modal-card {
+      background: var(--bg-card); border: 1.5px solid var(--brand-primary); border-radius: 10px;
+      padding: 24px; width: 100%; max-width: 400px; text-align: center;
+    }
+    .modal-card h3 { margin: 0 0 10px 0; color: var(--brand-primary); font-size: 18px; }
+    .modal-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+    .otp-input {
+      font-size: 24px; letter-spacing: 6px; text-align: center; font-weight: 700;
+      padding: 8px; width: 80%; margin-bottom: 16px; border-radius: 6px; border: 2px solid var(--brand-primary);
+      background: var(--bg-input); color: var(--brand-primary); outline: none;
+    }
+    .modal-buttons { display: flex; gap: 8px; justify-content: center; }
+
+    .success-card { background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 20px; margin-top: 20px; display: none; }
+    .success-title { font-size: 16px; font-weight: 700; color: #166534; margin-bottom: 8px; }
+    .success-msg { font-size: 13px; color: #14532d; line-height: 1.5; margin-bottom: 16px; }
+    .btn-download { background: var(--brand-primary); color: #ffffff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 700; font-size: 13px; cursor: pointer; }
+
+    #jsonOutput { background: var(--output-bg); border: 1px solid var(--border-card); border-radius: 6px; padding: 14px; margin-top: 20px; font-family: monospace; font-size: 11.5px; color: var(--output-text); white-space: pre-wrap; display: none; }
+  </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="badge">Sistema Operativo al 100%</div>
-        <h1>Celerdoc</h1>
-        <p>Tu plataforma avanzada de firma electrónica, auditoría criptográfica SHA-256 y trazabilidad de documentos en tiempo real ya está en línea.</p>
-        <p>El motor backend está conectado y listo para procesar contratos y respaldos de seguridad.</p>
-        <a href="http://localhost:8001/docs" class="btn" target="_blank">Ver Documentación de la API (Swagger)</a>
+  <div class="container">
+    <div class="top-controls">
+      <div class="right-controls">
+        <button class="btn-control" id="btnForceEn">🇺🇸 English (EN)</button>
+        <button class="btn-control" id="btnNativeCountry">🇨🇴 Colombia</button>
+        
+        <div class="country-selector-wrap">
+          <button class="btn-control" id="btnCountrySelect">🇨🇴 Colombia (+57) ▾</button>
+          <div class="country-dropdown" id="countryDropdown">
+            <div class="country-section-title" id="titleSugeridos">Top 20 Países Sugeridos</div>
+            <div id="listSuggested"></div>
+            <button class="btn-more-countries" id="btnShowAllCountries">Otros países (Catálogo completo)...</button>
+            <div id="listAllCountries" style="display: none; margin-top: 6px;"></div>
+          </div>
+        </div>
+
+        <button class="theme-toggle-btn" id="btnThemeToggle">☀️ Claro</button>
+      </div>
     </div>
 
+    <h1 id="txtTitulo">Celerdoc — Firmar Documento</h1>
+    <p class="desc" id="txtDesc">Cargue su documento original, ubique el punto de firma en espejo, verifique identidad mediante OTP y obtenga su documento certificado con trazabilidad legal inalterable.</p>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="tipoDoc" id="lblTipoDoc">Tipo de Documento</label>
+        <select id="tipoDoc">
+          <option value="NAT">Cédula / DNI / ID</option>
+          <option value="EXT">Cédula de Extranjería</option>
+          <option value="TAX">Identificación Tributaria (NIT/RFC/Tax ID/EIN)</option>
+          <option value="PAS">Pasaporte</option>
+          <option value="PER">Permiso Especial / Visa de Trabajo</option>
+          <option value="OTH">Otro (ej: Tarjeta de Identidad, etc.)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="numDoc" id="lblNumDoc">Número de Documento</label>
+        <input type="text" id="numDoc" value="" placeholder="">
+      </div>
+      <div class="form-group">
+        <label for="emailNotif" id="lblEmail">Correo Electrónico</label>
+        <input type="email" id="emailNotif" value="" placeholder="">
+      </div>
+      <div class="form-group">
+        <label for="whatsappNotif" id="lblWhatsapp">Celular / WhatsApp</label>
+        <div class="phone-input-wrap">
+          <span class="phone-prefix" id="phonePrefixLabel">+57</span>
+          <input type="text" id="whatsappNotif" value="" placeholder="">
+        </div>
+      </div>
+    </div>
+
+    <div class="dropzone" id="dropArea" onclick="document.getElementById('fileInput').click()">
+      <span id="txtDrop">Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF</span>
+      <input type="file" id="fileInput" accept="application/pdf">
+    </div>
+
+    <div class="toast-success" id="toastSuccess">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+      <span id="toastMsg">¡Documento cargado con éxito! El documento queda listo para firmarse.</span>
+    </div>
+
+    <!-- Barra de aviso de freno de seguridad de 2 segundos (activo desde la 2da página en adelante) -->
+    <div class="throttle-banner" id="throttleBanner">
+      <span id="throttleText">⏱️ Freno de seguridad activo: esperando 2 segundos para consolidar nueva página...</span>
+      <strong id="throttleCountdown">2s</strong>
+    </div>
+
+    <div class="card-meta hidden-meta" id="metaContainer">
+      <div class="card-row">
+        <span class="card-label" id="lblMetaOriginal">Documento Original:</span>
+        <span class="card-val" id="valNombre">-</span>
+      </div>
+      <div class="card-row">
+        <span class="card-label">SHA-256 Original:</span>
+        <span class="card-val" id="valSha256">-</span>
+      </div>
+      <div class="card-row">
+        <span class="card-label" id="lblMetaTimestamp">Fecha y Hora de Carga (UTC):</span>
+        <span class="card-val" id="valTimestamp">-</span>
+      </div>
+      <div class="card-row">
+        <span class="card-label" id="lblMetaPaginas">Total de Páginas Originales:</span>
+        <span class="card-val" id="valTotalPaginas">-</span>
+      </div>
+    </div>
+
+    <div class="nav-bar" id="navBar">
+      <div class="toolbar-group">
+        <button class="ux-btn" id="btnZoomOut" title="Reducir zoom">🔍 Reducir</button>
+        <button class="ux-btn" id="btnZoom100" title="Restablecer a 100%">100%</button>
+        <button class="ux-btn" id="btnZoomIn" title="Ampliar zoom">🔍 Ampliar</button>
+        <div class="divider"></div>
+        <button class="ux-btn" id="btnPrimeraPag" title="Ir a la primera página">⏮️ <span id="lblBtnFirst">Primera</span></button>
+        <button class="ux-btn" id="btnAntPag" title="Página anterior">◀️ <span id="lblBtnPrev">Anterior</span></button>
+        <div class="page-indicator">
+          <span id="lblPageText">Pág</span> <input type="number" id="inputNumPag" class="pdf-page-input" min="1" value="1"> <span id="lblOfText">de</span> <span id="lblTotalPagsToolbar">-</span>
+        </div>
+        <button class="ux-btn" id="btnSigPag" title="Página siguiente"><span id="lblBtnNext">Siguiente</span> ▶️</button>
+        <button class="ux-btn" id="btnUltimaPag" title="Ir a la última página"><span id="lblBtnLast">Última</span> ⏭️</button>
+        <div class="divider"></div>
+        <button class="btn-download-reader" id="btnDescargarLectura" title="Descargar documento para lectura detallada">📥 Descargar documento original</button>
+      </div>
+      <button class="btn-action" id="btnIniciarFirma" disabled>Aplicar y Validar Firma</button>
+    </div>
+
+    <div class="viewer-box" id="boxViewer">
+      <div class="pages-cascade-container" id="pagesCascadeContainer">
+        <div class="canvas-page-wrapper" id="wrapperPrev">
+          <div class="page-label-badge" id="badgePrev">Anterior</div>
+          <canvas id="canvasPrev"></canvas>
+        </div>
+        <div class="canvas-page-wrapper" id="wrapperActive">
+          <div class="page-label-badge" id="badgeActive">Activa / Nueva</div>
+          <canvas id="canvasEspejo"></canvas>
+          <div id="markerFirma">
+            <span id="lblMarkerTitle">ZONA DE FIRMA</span>
+            <span class="marker-watermark" id="lblMarkerWatermark">Desplaza con cursor o dedo</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOtp">
+      <div class="modal-card">
+        <h3 id="txtOtpTitulo">Verificación de Identidad por OTP</h3>
+        <p id="otpDestinoMsg"></p>
+        <input type="text" id="inputOtp" class="otp-input" maxlength="6" placeholder="______">
+        <div class="modal-buttons">
+          <button class="btn-action" id="btnConfirmarOtp">Confirmar y Generar Documento Certificado</button>
+          <button class="btn-action" id="btnCancelarOtp" style="background-color: #64748b;">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="success-card" id="successPanel">
+      <div class="success-title">¡Documento firmado y auditado con total éxito!</div>
+      <div class="success-msg" id="successText"></div>
+      <button class="btn-download" id="btnDescargar">Descargar Documento Firmado y Auditado</button>
+    </div>
+
+    <div id="jsonOutput"></div>
+  </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const API_URL = "http://127.0.0.1:8000";
+    const CODIGO_OTP_SIMULADO = "123456";
+
+    const catalogoPaises = [
+      { codigo: "CO", nombre: "Colombia", indicativo: "+57", bandera: "🇨🇴", lang: "es" },
+      { codigo: "MX", nombre: "México", indicativo: "+52", bandera: "🇲🇽", lang: "es" },
+      { codigo: "ES", nombre: "España", indicativo: "+34", bandera: "🇪🇸", lang: "es" },
+      { codigo: "AR", nombre: "Argentina", indicativo: "+54", bandera: "🇦🇷", lang: "es" },
+      { codigo: "CL", nombre: "Chile", indicativo: "+56", bandera: "🇨🇱", lang: "es" },
+      { codigo: "PE", nombre: "Perú", indicativo: "+51", bandera: "🇵🇪", lang: "es" },
+      { codigo: "EC", nombre: "Ecuador", indicativo: "+593", bandera: "🇪🇨", lang: "es" },
+      { codigo: "GT", nombre: "Guatemala", indicativo: "+502", bandera: "🇬🇹", lang: "es" },
+      { codigo: "CU", nombre: "Cuba", indicativo: "+53", bandera: "🇨🇺", lang: "es" },
+      { codigo: "BO", nombre: "Bolivia", indicativo: "+591", bandera: "🇧🇴", lang: "es" },
+      { codigo: "DO", nombre: "República Dominicana", indicativo: "+1", bandera: "🇩🇴", lang: "es" },
+      { codigo: "HN", nombre: "Honduras", indicativo: "+504", bandera: "🇭🇳", lang: "es" },
+      { codigo: "PY", nombre: "Paraguay", indicativo: "+595", bandera: "🇵🇾", lang: "es" },
+      { codigo: "SV", nombre: "El Salvador", indicativo: "+503", bandera: "🇸🇻", lang: "es" },
+      { codigo: "NI", nombre: "Nicaragua", indicativo: "+505", bandera: "🇳🇮", lang: "es" },
+      { codigo: "CR", nombre: "Costa Rica", indicativo: "+506", bandera: "🇨🇷", lang: "es" },
+      { codigo: "PA", nombre: "Panamá", indicativo: "+507", bandera: "🇵🇦", lang: "es" },
+      { codigo: "UY", nombre: "Uruguay", indicativo: "+598", bandera: "🇺🇾", lang: "es" },
+      { codigo: "PR", nombre: "Puerto Rico", indicativo: "+1", bandera: "🇵🇷", lang: "es" },
+      { codigo: "VE", nombre: "Venezuela", indicativo: "+58", bandera: "🇻🇪", lang: "es" },
+      { codigo: "US", nombre: "United States", indicativo: "+1", bandera: "🇺🇸", lang: "en" },
+      { codigo: "GB", nombre: "United Kingdom", indicativo: "+44", bandera: "🇬🇧", lang: "en" },
+      { codigo: "CA", nombre: "Canada", indicativo: "+1", bandera: "🇨🇦", lang: "en" },
+      { codigo: "AU", nombre: "Australia", indicativo: "+61", bandera: "🇦🇺", lang: "en" },
+      { codigo: "NZ", nombre: "New Zealand", indicativo: "+64", bandera: "🇳🇿", lang: "en" },
+      { codigo: "IE", nombre: "Ireland", indicativo: "+353", bandera: "🇮🇪", lang: "en" },
+      { codigo: "BR", nombre: "Brasil", indicativo: "+55", bandera: "🇧🇷", lang: "pt" },
+      { codigo: "FR", nombre: "France", indicativo: "+33", bandera: "🇫🇷", lang: "fr" },
+      { codigo: "DE", nombre: "Deutschland", indicativo: "+49", bandera: "🇩🇪", lang: "de" },
+      { codigo: "IT", nombre: "Italia", indicativo: "+39", bandera: "🇮🇹", lang: "it" },
+      { codigo: "JP", nombre: "日本 (Japan)", indicativo: "+81", bandera: "🇯🇵", lang: "ja" },
+      { codigo: "CN", nombre: "中国 (China)", indicativo: "+86", bandera: "🇨🇳", lang: "zh" }
+    ];
+
+    const textosIdiomas = {
+      es: {
+        titulo: "Celerdoc — Firmar Documento",
+        desc: "Cargue su documento original, ubique el punto de firma en espejo, verifique identidad mediante OTP y obtenga su documento certificado con trazabilidad legal inalterable.",
+        lblTipoDoc: "Tipo de Documento",
+        lblNumDoc: "Número de Documento",
+        lblEmail: "Correo Electrónico",
+        lblWhatsapp: "Celular / WhatsApp",
+        dropText: "Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF",
+        lblMetaOriginal: "Documento Original:",
+        lblMetaTimestamp: "Fecha y Hora de Carga (UTC):",
+        lblMetaPaginas: "Total de Páginas Originales:",
+        btnFirmar: "Aplicar y Validar Firma",
+        otpTitulo: "Verificación de Identidad por OTP",
+        btnConfirmarOtp: "Confirmar y Generar Documento Certificado",
+        btnCancelarOtp: "Cancelar",
+        btnDescargar: "Descargar Documento Firmado y Auditado",
+        sugeridosTitulo: "Top 20 Países Sugeridos",
+        verTodos: "Otros países (Catálogo completo)...",
+        zoomIn: "🔍 Ampliar",
+        zoomOut: "🔍 Reducir",
+        first: "Primera",
+        prev: "Anterior",
+        next: "Siguiente",
+        last: "Última",
+        pageText: "Pág",
+        ofText: "de",
+        markerTitle: "ZONA DE FIRMA",
+        markerWatermark: "Desplaza con cursor o dedo",
+        downloadReader: "📥 Descargar documento original",
+        badgePrev: "Página Anterior",
+        badgeActive: "Página Activa / Nueva",
+        throttleMsg: (s) => `⏱️ Freno de seguridad activo: esperando ${s}s para consolidar nueva página...`,
+        toastLoad: (name) => `¡"${name}" cargado con éxito! El documento queda listo para firmarse.`,
+        docs: [
+          { val: "NAT", text: "Cédula / DNI / ID" },
+          { val: "EXT", text: "Cédula de Extranjería" },
+          { val: "TAX", text: "Identificación Tributaria (NIT/RFC/Tax ID/EIN)" },
+          { val: "PAS", text: "Pasaporte" },
+          { val: "PER", text: "Permiso Especial / Visa de Trabajo" },
+          { val: "OTH", text: "Otro (ej: Tarjeta de Identidad, etc.)" }
+        ]
+      },
+      en: {
+        titulo: "Celerdoc — Sign Document",
+        desc: "Upload your original document, place signature point on mirror view, verify identity via OTP and obtain your certified document with tamper-proof legal traceability.",
+        lblTipoDoc: "Document Type",
+        lblNumDoc: "Document Number",
+        lblEmail: "Corporate Email",
+        lblWhatsapp: "Mobile / WhatsApp",
+        dropText: "Click, drag, or paste (Ctrl+V) your PDF file here",
+        lblMetaOriginal: "Original Document:",
+        lblMetaTimestamp: "Upload Date & Time (UTC):",
+        lblMetaPaginas: "Total Original Pages:",
+        btnFirmar: "Apply & Validate Signature",
+        otpTitulo: "Identity Verification via OTP",
+        btnConfirmarOtp: "Confirm & Generate Certified Document",
+        btnCancelarOtp: "Cancel",
+        btnDescargar: "Download Signed & Audited Document",
+        sugeridosTitulo: "Top 20 Suggested Countries",
+        verTodos: "Other countries (Full catalog)...",
+        zoomIn: "🔍 Zoom In",
+        zoomOut: "🔍 Zoom Out",
+        first: "First",
+        prev: "Prev",
+        next: "Next",
+        last: "Last",
+        pageText: "Page",
+        ofText: "of",
+        markerTitle: "SIGNATURE ZONE",
+        markerWatermark: "Drag with cursor or finger",
+        downloadReader: "📥 Download original document",
+        badgePrev: "Previous Page",
+        badgeActive: "Active / New Page",
+        throttleMsg: (s) => `⏱️ Safety brake active: waiting ${s}s to consolidate new page...`,
+        toastLoad: (name) => `"${name}" successfully uploaded! Ready for signing.`,
+        docs: [
+          { val: "NAT", text: "National ID / DNI / ID" },
+          { val: "EXT", text: "Foreign ID Card" },
+          { val: "TAX", text: "Tax ID / Fiscal ID (NIT/RFC/Tax ID/EIN)" },
+          { val: "PAS", text: "Passport" },
+          { val: "PER", text: "Special Permit / Work Visa" },
+          { val: "OTH", text: "Other (e.g., Identity Card, etc.)" }
+        ]
+      }
+    };
+
+    let idiomaActivo = 'es';
+    let paisActivo = catalogoPaises[0];
+    let paisNativoDetectado = catalogoPaises[0];
+    let temaActual = 'light';
+    let escalaActual = 1.2;
+
+    const btnThemeToggle = document.getElementById('btnThemeToggle');
+    btnThemeToggle.addEventListener('click', () => {
+      temaActual = (temaActual === 'light') ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', temaActual);
+      btnThemeToggle.textContent = (temaActual === 'light') ? '☀️ Claro' : '🌙 Oscuro';
+    });
+
+    const btnCountrySelect = document.getElementById('btnCountrySelect');
+    const countryDropdown = document.getElementById('countryDropdown');
+    const listSuggested = document.getElementById('listSuggested');
+    const listAllCountries = document.getElementById('listAllCountries');
+    const btnShowAllCountries = document.getElementById('btnShowAllCountries');
+
+    btnCountrySelect.addEventListener('click', (e) => {
+      e.stopPropagation();
+      countryDropdown.classList.toggle('open');
+    });
+
+    document.addEventListener('click', () => {
+      countryDropdown.classList.remove('open');
+    });
+
+    btnShowAllCountries.addEventListener('click', (e) => {
+      e.stopPropagation();
+      listAllCountries.style.display = listAllCountries.style.display === 'none' ? 'block' : 'none';
+      btnShowAllCountries.textContent = listAllCountries.style.display === 'none' ? textosIdiomas[idiomaActivo].verTodos : '▲ Ocultar lista';
+    });
+
+    function seleccionarPais(pais) {
+      paisActivo = pais;
+      btnCountrySelect.textContent = `${pais.bandera} ${pais.nombre} (${pais.indicativo}) ▾`;
+      document.getElementById('phonePrefixLabel').textContent = pais.indicativo;
+      countryDropdown.classList.remove('open');
+      
+      if (pais.lang === 'es' || pais.lang === 'en') {
+        aplicarIdioma(pais.lang);
+      } else {
+        aplicarIdioma('en');
+      }
+    }
+
+    function renderSelectorPaises() {
+      listSuggested.innerHTML = '';
+      listAllCountries.innerHTML = '';
+
+      const sugeridos = catalogoPaises.filter(p => p.lang === idiomaActivo).slice(0, 20);
+      const otros = catalogoPaises.filter(p => !sugeridos.includes(p));
+
+      sugeridos.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'country-item';
+        item.innerHTML = `<span>${p.bandera} ${p.nombre}</span><span class="indicativo">${p.indicativo}</span>`;
+        item.onclick = () => seleccionarPais(p);
+        listSuggested.appendChild(item);
+      });
+
+      otros.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'country-item';
+        item.innerHTML = `<span>${p.bandera} ${p.nombre}</span><span class="indicativo">${p.indicativo}</span>`;
+        item.onclick = () => seleccionarPais(p);
+        listAllCountries.appendChild(item);
+      });
+    }
+
+    function aplicarIdioma(lang) {
+      idiomaActivo = (textosIdiomas[lang]) ? lang : 'en';
+      const t = textosIdiomas[idiomaActivo];
+
+      document.getElementById('txtTitulo').textContent = t.titulo;
+      document.getElementById('txtDesc').textContent = t.desc;
+      document.getElementById('lblTipoDoc').textContent = t.lblTipoDoc;
+      document.getElementById('lblNumDoc').textContent = t.lblNumDoc;
+      document.getElementById('lblEmail').textContent = t.lblEmail;
+      document.getElementById('lblWhatsapp').textContent = t.lblWhatsapp;
+      if (!datosTrazabilidad.nombre_archivo) {
+        document.getElementById('txtDrop').textContent = t.dropText;
+      }
+      document.getElementById('lblMetaOriginal').textContent = t.lblMetaOriginal;
+      document.getElementById('lblMetaTimestamp').textContent = t.lblMetaTimestamp;
+      document.getElementById('lblMetaPaginas').textContent = t.lblMetaPaginas;
+      document.getElementById('btnIniciarFirma').textContent = t.btnFirmar;
+      document.getElementById('txtOtpTitulo').textContent = t.otpTitulo;
+      document.getElementById('btnConfirmarOtp').textContent = t.btnConfirmarOtp;
+      document.getElementById('btnCancelarOtp').textContent = t.btnCancelarOtp;
+      document.getElementById('btnDescargar').textContent = t.btnDescargar;
+      document.getElementById('titleSugeridos').textContent = t.sugeridosTitulo;
+      btnShowAllCountries.textContent = t.verTodos;
+
+      document.getElementById('btnZoomIn').innerHTML = t.zoomIn;
+      document.getElementById('btnZoomOut').innerHTML = t.zoomOut;
+      document.getElementById('lblBtnFirst').textContent = t.first;
+      document.getElementById('lblBtnPrev').textContent = t.prev;
+      document.getElementById('lblBtnNext').textContent = t.next;
+      document.getElementById('lblBtnLast').textContent = t.last;
+      document.getElementById('lblPageText').textContent = t.pageText;
+      document.getElementById('lblOfText').textContent = t.ofText;
+      document.getElementById('lblMarkerTitle').textContent = t.markerTitle;
+      document.getElementById('lblMarkerWatermark').textContent = t.markerWatermark;
+      document.getElementById('btnDescargarLectura').textContent = t.downloadReader;
+      document.getElementById('badgePrev').textContent = t.badgePrev;
+      document.getElementById('badgeActive').textContent = t.badgeActive;
+
+      const selDoc = document.getElementById('tipoDoc');
+      const valPrevio = selDoc.value || "NAT";
+      selDoc.innerHTML = '';
+      t.docs.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.val;
+        opt.textContent = d.text;
+        selDoc.appendChild(opt);
+      });
+      selDoc.value = valPrevio;
+
+      renderSelectorPaises();
+    }
+
+    document.getElementById('btnForceEn').addEventListener('click', () => {
+      const paisUs = catalogoPaises.find(p => p.codigo === 'US');
+      if (paisUs) seleccionarPais(paisUs);
+    });
+
+    document.getElementById('btnNativeCountry').addEventListener('click', () => {
+      seleccionarPais(paisNativoDetectado);
+    });
+
+    function detectarNavegador() {
+      const locale = navigator.language || (navigator.languages && navigator.languages[0]) || 'es-CO';
+      const langCode = locale.split('-')[0].toLowerCase();
+      const countryCode = locale.includes('-') ? locale.split('-')[1].toUpperCase() : '';
+
+      paisNativoDetectado = catalogoPaises.find(p => p.codigo === countryCode) || catalogoPaises.find(p => p.lang === langCode) || catalogoPaises[0];
+      
+      document.getElementById('btnNativeCountry').textContent = `${paisNativoDetectado.bandera} ${paisNativoDetectado.nombre}`;
+      
+      const idiomaFinal = (textosIdiomas[langCode]) ? langCode : 'en';
+      aplicarIdioma(idiomaFinal);
+      seleccionarPais(paisNativoDetectado);
+    }
+
+    let pdfActual = null;
+    let base64String = '';
+    let blobOriginalUrl = '';
+    let paginasExtraEnBlanco = 0;
+    
+    let throttleTimerActive = false;
+    let throttleTimeoutId = null;
+    let countdownIntervalId = null;
+
+    let datosTrazabilidad = {
+      nombre_archivo: '',
+      sha256_original: '',
+      timestamp_utc: '',
+      total_paginas: 0,
+      pagina_activa: 0,
+      coordenadas: { x_pct: null, y_pct: null }
+    };
+    let descargaUrlActual = '';
+
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+    const txtDrop = document.getElementById('txtDrop');
+    const toastSuccess = document.getElementById('toastSuccess');
+    const toastMsg = document.getElementById('toastMsg');
+    const throttleBanner = document.getElementById('throttleBanner');
+    const throttleCountdown = document.getElementById('throttleCountdown');
+    const metaContainer = document.getElementById('metaContainer');
+    const navBar = document.getElementById('navBar');
+    const boxViewer = document.getElementById('boxViewer');
+    
+    const canvasActive = document.getElementById('canvasEspejo');
+    const ctxActive = canvasActive.getContext('2d');
+    const canvasPrev = document.getElementById('canvasPrev');
+    const ctxPrev = canvasPrev.getContext('2d');
+    const wrapperPrev = document.getElementById('wrapperPrev');
+
+    const markerFirma = document.getElementById('markerFirma');
+    const btnIniciarFirma = document.getElementById('btnIniciarFirma');
+    const modalOtp = document.getElementById('modalOtp');
+    const inputOtp = document.getElementById('inputOtp');
+    const btnConfirmarOtp = document.getElementById('btnConfirmarOtp');
+    const btnCancelarOtp = document.getElementById('btnCancelarOtp');
+    const successPanel = document.getElementById('successPanel');
+    const successText = document.getElementById('successText');
+    const btnDescargar = document.getElementById('btnDescargar');
+    const btnDescargarLectura = document.getElementById('btnDescargarLectura');
+    const jsonOutput = document.getElementById('jsonOutput');
+
+    const btnZoomOut = document.getElementById('btnZoomOut');
+    const btnZoom100 = document.getElementById('btnZoom100');
+    const btnZoomIn = document.getElementById('btnZoomIn');
+    const btnPrimeraPag = document.getElementById('btnPrimeraPag');
+    const btnAntPag = document.getElementById('btnAntPag');
+    const btnSigPag = document.getElementById('btnSigPag');
+    const btnUltimaPag = document.getElementById('btnUltimaPag');
+    const inputNumPag = document.getElementById('inputNumPag');
+    const lblTotalPagsToolbar = document.getElementById('lblTotalPagsToolbar');
+
+    async function procesarArchivoPDF(archivo) {
+      if (!archivo || (archivo.type && archivo.type !== 'application/pdf')) {
+        alert("Por favor seleccione o pegue un archivo PDF válido.");
+        return;
+      }
+
+      datosTrazabilidad.nombre_archivo = archivo.name || "documento.pdf";
+      datosTrazabilidad.timestamp_utc = new Date().toISOString();
+      txtDrop.textContent = `Archivo cargado: ${datosTrazabilidad.nombre_archivo}`;
+
+      blobOriginalUrl = URL.createObjectURL(archivo);
+      paginasExtraEnBlanco = 0;
+      throttleTimerActive = false;
+
+      const t = textosIdiomas[idiomaActivo];
+      toastMsg.textContent = t.toastLoad(datosTrazabilidad.nombre_archivo);
+      toastSuccess.style.display = 'flex';
+      setTimeout(() => {
+        toastSuccess.style.display = 'none';
+      }, 3500);
+
+      const arrayBuffer = await archivo.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      base64String = btoa(binary);
+
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      datosTrazabilidad.sha256_original = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      pdfActual = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      datosTrazabilidad.total_paginas = pdfActual.numPages;
+
+      document.getElementById('valNombre').textContent = datosTrazabilidad.nombre_archivo;
+      document.getElementById('valSha256').textContent = datosTrazabilidad.sha256_original;
+      document.getElementById('valTimestamp').textContent = datosTrazabilidad.timestamp_utc;
+      document.getElementById('valTotalPaginas').textContent = datosTrazabilidad.total_paginas;
+
+      lblTotalPagsToolbar.textContent = pdfActual.numPages;
+      inputNumPag.max = pdfActual.numPages;
+      
+      navBar.style.display = 'flex';
+      boxViewer.style.display = 'block';
+
+      if (pdfActual.numPages > 100) {
+        btnDescargarLectura.style.display = 'inline-flex';
+      } else {
+        btnDescargarLectura.style.display = 'none';
+      }
+
+      irAPagina(pdfActual.numPages);
+    }
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) procesarArchivoPDF(e.target.files[0]);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, (e) => { e.preventDefault(); });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, (e) => { e.preventDefault(); });
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) procesarArchivoPDF(files[0]);
+    });
+
+    window.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || window.clipboardData).items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file') {
+          const blob = items[i].getAsFile();
+          procesarArchivoPDF(blob);
+          break;
+        }
+      }
+    });
+
+    function verificarYLiberarPaginaExtra() {
+      if (paginasExtraEnBlanco > 0) {
+        // Comprobar si la zona de firma (datosTrazabilidad.pagina_activa) ya no está en ninguna página extra
+        const maxOriginal = pdfActual.numPages;
+        if (datosTrazabilidad.pagina_activa <= maxOriginal) {
+          paginasExtraEnBlanco = 0;
+          lblTotalPagsToolbar.textContent = maxOriginal;
+          inputNumPag.max = maxOriginal;
+        }
+      }
+    }
+
+    function irAPagina(num) {
+      if (!pdfActual) return;
+      
+      const maxPaginasTotal = pdfActual.numPages + paginasExtraEnBlanco;
+
+      if (num < 1) num = 1;
+      if (num > maxPaginasTotal) num = maxPaginasTotal;
+      
+      datosTrazabilidad.pagina_activa = num;
+      inputNumPag.value = num;
+      
+      btnPrimeraPag.disabled = (num === 1);
+      btnAntPag.disabled = (num === 1);
+      btnSigPag.disabled = (num === maxPaginasTotal);
+      btnUltimaPag.disabled = (num === maxPaginasTotal);
+
+      renderizarVisualizadorCascade(num);
+    }
+
+    btnPrimeraPag.addEventListener('click', () => irAPagina(1));
+    btnUltimaPag.addEventListener('click', () => irAPagina(pdfActual.numPages + paginasExtraEnBlanco));
+    btnAntPag.addEventListener('click', () => irAPagina(datosTrazabilidad.pagina_activa - 1));
+    btnSigPag.addEventListener('click', () => irAPagina(datosTrazabilidad.pagina_activa + 1));
+    inputNumPag.addEventListener('change', (e) => irAPagina(parseInt(e.target.value) || 1));
+
+    btnZoomIn.addEventListener('click', () => {
+      if (escalaActual < 2.5) {
+        escalaActual += 0.2;
+        renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
+      }
+    });
+
+    btnZoom100.addEventListener('click', () => {
+      escalaActual = 1.0;
+      renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
+    });
+
+    btnZoomOut.addEventListener('click', () => {
+      if (escalaActual > 0.6) {
+        escalaActual -= 0.2;
+        renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
+      }
+    });
+
+    btnDescargarLectura.addEventListener('click', () => {
+      if (blobOriginalUrl) {
+        const a = document.createElement('a');
+        a.href = blobOriginalUrl;
+        a.download = datosTrazabilidad.nombre_archivo || "documento_original.pdf";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    });
+
+    async function renderizarVisualizadorCascade(numPagina) {
+      if (numPagina <= pdfActual.numPages) {
+        const pageAct = await pdfActual.getPage(numPagina);
+        const vpAct = pageAct.getViewport({ scale: escalaActual });
+        canvasActive.width = vpAct.width;
+        canvasActive.height = vpAct.height;
+        await pageAct.render({ canvasContext: ctxActive, viewport: vpAct }).promise;
+      } else {
+        const pageRef = await pdfActual.getPage(pdfActual.numPages);
+        const vpRef = pageRef.getViewport({ scale: escalaActual });
+        canvasActive.width = vpRef.width;
+        canvasActive.height = vpRef.height;
+        ctxActive.fillStyle = (temaActual === 'dark') ? '#1e293b' : '#ffffff';
+        ctxActive.fillRect(0, 0, canvasActive.width, canvasActive.height);
+      }
+
+      if (numPagina > 1) {
+        wrapperPrev.style.display = 'block';
+        const numPrev = numPagina - 1;
+        if (numPrev <= pdfActual.numPages) {
+          const pagePrev = await pdfActual.getPage(numPrev);
+          const vpPrev = pagePrev.getViewport({ scale: escalaActual });
+          canvasPrev.width = vpPrev.width;
+          canvasPrev.height = vpPrev.height;
+          await pagePrev.render({ canvasContext: ctxPrev, viewport: vpPrev }).promise;
+        } else {
+          const pageRef = await pdfActual.getPage(pdfActual.numPages);
+          const vpRef = pageRef.getViewport({ scale: escalaActual });
+          canvasPrev.width = vpRef.width;
+          canvasPrev.height = vpRef.height;
+          ctxPrev.fillStyle = (temaActual === 'dark') ? '#1e293b' : '#ffffff';
+          ctxPrev.fillRect(0, 0, canvasPrev.width, canvasPrev.height);
+        }
+      } else {
+        wrapperPrev.style.display = 'none';
+      }
+
+      if (!datosTrazabilidad.coordenadas.x_pct || datosTrazabilidad.pagina_activa !== numPagina) {
+        const defaultX = canvasActive.width / 2;
+        const defaultY = canvasActive.height - 85;
+        markerFirma.style.left = `${defaultX}px`;
+        markerFirma.style.top = `${defaultY}px`;
+        markerFirma.style.display = 'flex';
+        
+        datosTrazabilidad.coordenadas = {
+          x_pct: parseFloat(((defaultX / canvasActive.width) * 100).toFixed(2)),
+          y_pct: parseFloat(((defaultY / canvasActive.height) * 100).toFixed(2))
+        };
+        btnIniciarFirma.disabled = false;
+      } else {
+        const posX = (datosTrazabilidad.coordenadas.x_pct / 100) * canvasActive.width;
+        const posY = (datosTrazabilidad.coordenadas.y_pct / 100) * canvasActive.height;
+        markerFirma.style.left = `${posX}px`;
+        markerFirma.style.top = `${posY}px`;
+        markerFirma.style.display = 'flex';
+      }
+    }
+
+    let isDragging = false;
+
+    markerFirma.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      e.stopPropagation();
+    });
+
+    markerFirma.addEventListener('touchstart', (e) => {
+      isDragging = true;
+      e.stopPropagation();
+    }, { passive: true });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      actualizarPosicionMarcador(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const touch = e.touches[0];
+      actualizarPosicionMarcador(touch.clientX, touch.clientY);
+    }, { passive: true });
+
+    window.addEventListener('mouseup', () => { isDragging = false; });
+    window.addEventListener('touchend', () => { isDragging = false; });
+
+    canvasActive.addEventListener('click', (e) => {
+      actualizarPosicionMarcador(e.clientX, e.clientY);
+    });
+
+    function actualizarPosicionMarcador(clientX, clientY) {
+      const rect = canvasActive.getBoundingClientRect();
+      let clickX = clientX - rect.left;
+      let clickY = clientY - rect.top;
+
+      // Si se arrastra la zona de firma por debajo del límite inferior de la página actual
+      if (clickY > rect.height) {
+        const esPrimeraPagina = (datosTrazabilidad.pagina_activa === 1);
+
+        if (esPrimeraPagina) {
+          paginasExtraEnBlanco += 1;
+          const nuevoTotal = pdfActual.numPages + paginasExtraEnBlanco;
+          lblTotalPagsToolbar.textContent = nuevoTotal;
+          inputNumPag.max = nuevoTotal;
+          datosTrazabilidad.coordenadas.y_pct = 15.0; 
+          irAPagina(nuevoTotal);
+          return;
+        } else {
+          if (!throttleTimerActive) {
+            throttleTimerActive = true;
+            let tiempoRestante = 2;
+            const t = textosIdiomas[idiomaActivo];
+            
+            throttleBanner.style.display = 'flex';
+            throttleCountdown.textContent = `${tiempoRestante}s`;
+            
+            countdownIntervalId = setInterval(() => {
+              tiempoRestante -= 1;
+              if (tiempoRestante > 0) {
+                throttleCountdown.textContent = `${tiempoRestante}s`;
+                throttleText.textContent = `⏱️ Freno de seguridad activo: esperando ${tiempoRestante}s para consolidar nueva página...`;
+              } else {
+                clearInterval(countdownIntervalId);
+              }
+            }, 1000);
+
+            throttleTimeoutId = setTimeout(() => {
+              throttleBanner.style.display = 'none';
+              throttleTimerActive = false;
+              
+              paginasExtraEnBlanco += 1;
+              const nuevoTotal = pdfActual.numPages + paginasExtraEnBlanco;
+              lblTotalPagsToolbar.textContent = nuevoTotal;
+              inputNumPag.max = nuevoTotal;
+              
+              datosTrazabilidad.coordenadas.y_pct = 15.0; 
+              irAPagina(nuevoTotal);
+            }, 2000);
+          }
+          return;
+        }
+      } else {
+        if (throttleTimerActive) {
+          clearTimeout(throttleTimeoutId);
+          clearInterval(countdownIntervalId);
+          throttleBanner.style.display = 'none';
+          throttleTimerActive = false;
+        }
+      }
+
+      if (clickX < 0) clickX = 0;
+      if (clickX > rect.width) clickX = rect.width;
+      if (clickY < 0) clickY = 0;
+      if (clickY > rect.height) clickY = rect.height;
+
+      datosTrazabilidad.coordenadas = {
+        x_pct: parseFloat(((clickX / rect.width) * 100).toFixed(2)),
+        y_pct: parseFloat(((clickY / rect.height) * 100).toFixed(2))
+      };
+
+      markerFirma.style.left = `${clickX}px`;
+      markerFirma.style.top = `${clickY}px`;
+      markerFirma.style.display = 'flex';
+      btnIniciarFirma.disabled = false;
+
+      // Si el usuario reubica la zona de firma de regreso hacia una página existente, liberamos la página extra si ya no está en uso
+      verificarYLiberarPaginaExtra();
+    }
+
+    btnIniciarFirma.addEventListener('click', () => {
+      const tel = document.getElementById('whatsappNotif').value;
+      const email = document.getElementById('emailNotif').value;
+      const ind = paisActivo.indicativo;
+
+      document.getElementById('otpDestinoMsg').innerHTML = `Código de seguridad enviado a: <strong>${ind} ${tel || 'N/A'}</strong> / <strong>${email || 'N/A'}</strong><br><br><span style="color: var(--brand-primary); font-weight: 700;">(Código simulado: 123456)</span>`;
+      inputOtp.value = '';
+      modalOtp.style.display = 'flex';
+      inputOtp.focus();
+    });
+
+    btnCancelarOtp.addEventListener('click', () => {
+      modalOtp.style.display = 'none';
+    });
+
+    btnConfirmarOtp.addEventListener('click', async () => {
+      const codigoIngresado = inputOtp.value.trim();
+
+      if (codigoIngresado !== CODIGO_OTP_SIMULADO) {
+        alert("Código OTP incorrecto. Ingrese: 123456");
+        inputOtp.focus();
+        return;
+      }
+
+      modalOtp.style.display = 'none';
+      btnIniciarFirma.disabled = true;
+      btnIniciarFirma.textContent = "Procesando...";
+
+      const tipoDocSelect = document.getElementById('tipoDoc');
+      const tipoDocVal = tipoDocSelect.value;
+      const tipoDocTexto = tipoDocSelect.options[tipoDocSelect.selectedIndex].text;
+      const numDoc = document.getElementById('numDoc').value || '00000000';
+      const email = document.getElementById('emailNotif').value || null;
+      const ind = paisActivo.indicativo;
+      const whatsapp = (document.getElementById('whatsappNotif').value) ? `${ind} ${document.getElementById('whatsappNotif').value}` : null;
+
+      const ahora = new Date();
+      const anio = ahora.getFullYear();
+      const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+      const dia = String(ahora.getDate()).padStart(2, '0');
+      const hora = String(ahora.getHours()).padStart(2, '0');
+      const min = String(ahora.getMinutes()).padStart(2, '0');
+      const seg = String(ahora.getSeconds()).padStart(2, '0');
+      const timestampSufijo = `${anio}${mes}${dia}_${hora}${min}${seg}`;
+      const nombreBaseSinExt = datosTrazabilidad.nombre_archivo.replace(/\.[^/.]+$/, "");
+      const nombreFinalEsperado = `${nombreBaseSinExt}_${tipoDocVal}_${numDoc}_${timestampSufijo}.pdf`;
+
+      const payload = {
+        nombre_archivo: datosTrazabilidad.nombre_archivo,
+        nombre_final_sugerido: nombreFinalEsperado,
+        archivo_base64: base64String,
+        tipo_documento: tipoDocTexto,
+        numero_documento: numDoc,
+        total_firmantes: 1,
+        pagina_seleccionada: datosTrazabilidad.pagina_activa,
+        total_paginas_con_extras: pdfActual.numPages + paginasExtraEnBlanco,
+        coordenadas: datosTrazabilidad.coordenadas,
+        email_notificacion: email,
+        whatsapp_notificacion: whatsapp
+      };
+
+      try {
+        const resp = await fetch(`${API_URL}/procesar-firma`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) throw new Error("Error en el servidor al firmar");
+
+        const data = await resp.json();
+        descargaUrlActual = `${API_URL}${data.datos_archivo.ruta_descarga}`;
+
+        successText.innerHTML = `
+          <strong>Documento Final:</strong> ${data.datos_archivo.nombre_final || nombreFinalEsperado}<br>
+          <strong>SHA-256 Original:</strong> ${data.criptografia_trazabilidad.sha256_original}<br>
+          <strong>SHA-256 Final:</strong> ${data.criptografia_trazabilidad.sha256_final}<br>
+          <strong>Código Validador:</strong> ${data.criptografia_trazabilidad.codigo_validador}<br><br>
+          <em>¡Firma completada con total éxito y aplicada al documento! Notificación programada a ${email || 'correo'} y WhatsApp (${whatsapp || 'no registrado'}).</em>
+        `;
+        successPanel.style.display = 'block';
+
+        jsonOutput.textContent = JSON.stringify(data, null, 2);
+        jsonOutput.style.display = 'block';
+
+      } catch (err) {
+        alert("Ocurrió un error al procesar la firma en el servidor.");
+        console.error(err);
+      } finally {
+        btnIniciarFirma.disabled = false;
+        btnIniciarFirma.textContent = "Aplicar y Validar Firma";
+      }
+    });
+
+    btnDescargar.addEventListener('click', () => {
+      if (descargaUrlActual) {
+        window.open(descargaUrlActual, '_blank');
+      }
+    });
+
+    detectarNavegador();
+  </script>
 </body>
 </html>
