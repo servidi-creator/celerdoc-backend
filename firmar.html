@@ -1,0 +1,1447 @@
+﻿<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Celerdoc — Firmar Documento</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root[data-theme="light"] {
+      --bg-body: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-input: #ffffff;
+      --border-card: #cbd5e1;
+      --border-input: #94a3b8;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --text-label: #1e293b;
+      --brand-primary: #3366CC;
+      --brand-primary-hover: #274fa8;
+      --bg-subtle: #f1f5f9;
+      --border-subtle: #e2e8f0;
+      --viewer-bg: #e2e8f0;
+      --dropdown-bg: #ffffff;
+      --dropdown-hover: #f1f5f9;
+      --color-error: #dc2626;
+      --border-error: #ef4444;
+      --bg-error-light: #fef2f2;
+    }
+
+    :root[data-theme="dark"] {
+      --bg-body: #0b1120;
+      --bg-card: #1e293b;
+      --bg-input: #0f172a;
+      --border-card: #334155;
+      --border-input: #475569;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-label: #cbd5e1;
+      --brand-primary: #4d82ec;
+      --brand-primary-hover: #3366CC;
+      --bg-subtle: #0f172a;
+      --border-subtle: #334155;
+      --viewer-bg: #334155;
+      --dropdown-bg: #1e293b;
+      --dropdown-hover: #334155;
+      --color-error: #f87171;
+      --border-error: #ef4444;
+      --bg-error-light: #450a0a;
+    }
+
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 24px 16px; display: flex; flex-direction: column; align-items: center; }
+    .container { width: 100%; max-width: 1050px; background-color: var(--bg-card); border: 1px solid var(--border-card); border-radius: 10px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
+
+    .top-controls { display: flex; justify-content: flex-end; align-items: center; background: var(--bg-subtle); border: 1px solid var(--border-subtle); padding: 10px 14px; border-radius: 8px; margin-bottom: 20px; gap: 10px; position: relative; }
+    .right-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    
+    .btn-control { background: var(--bg-card); border: 1px solid var(--border-input); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
+    .btn-control:hover, .btn-control.active { border-color: var(--brand-primary); background: var(--brand-primary); color: #ffffff; }
+    
+    .country-selector-wrap { position: relative; }
+    .country-dropdown { position: absolute; top: 110%; right: 0; background: var(--dropdown-bg); border: 1px solid var(--border-card); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); width: 300px; max-height: 400px; overflow-y: auto; display: none; z-index: 100; padding: 6px; }
+    .country-dropdown.open { display: block; }
+    .country-section-title { font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 6px 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .country-item { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 5px; cursor: pointer; font-size: 13px; color: var(--text-main); }
+    .country-item:hover { background: var(--dropdown-hover); }
+    .country-item span.indicativo { color: var(--brand-primary); font-weight: 500; font-size: 12px; }
+    .btn-more-countries { width: 100%; border: none; background: var(--bg-subtle); color: var(--brand-primary); padding: 9px; border-radius: 5px; font-weight: 600; font-size: 12px; cursor: pointer; text-align: center; margin-top: 6px; }
+    .btn-more-countries:hover { background: var(--border-subtle); }
+
+    .theme-toggle-btn { background: var(--bg-card); border: 1px solid var(--border-input); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 12.5px; cursor: pointer; font-weight: 500; transition: all 0.2s ease; }
+    .theme-toggle-btn:hover { border-color: var(--brand-primary); }
+
+    h1 { margin: 0 0 6px 0; font-size: 22px; color: var(--brand-primary); font-weight: 600; }
+    p.desc { margin: 0 0 20px 0; color: var(--text-muted); font-size: 13px; line-height: 1.4; }
+
+    .form-grid { 
+      display: grid; 
+      grid-template-columns: 1.3fr 1.6fr 1.3fr 1.5fr 1.5fr; 
+      gap: 12px; 
+      margin-bottom: 16px; 
+      align-items: start;
+    }
+    
+    @media (max-width: 992px) {
+      .form-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    .form-group { display: flex; flex-direction: column; position: relative; }
+    label { font-size: 12px; font-weight: 600; color: var(--text-label); height: 24px; display: flex; align-items: flex-end; margin-bottom: 6px; }
+    input[type="text"], input[type="email"], select { background-color: var(--bg-input); border: 1px solid var(--border-input); color: var(--text-main); padding: 9px 10px; border-radius: 6px; font-size: 13px; outline: none; width: 100%; height: 38px; transition: border-color 0.2s; }
+    input[type="text"]:focus, input[type="email"]:focus, select:focus { border-color: var(--brand-primary); }
+    
+    .input-error { border-color: var(--border-error) !important; background-color: var(--bg-error-light) !important; }
+    .error-msg-field { font-size: 11px; color: var(--color-error); font-weight: 500; margin-top: 4px; display: none; }
+
+    .phone-input-wrap { display: flex; align-items: center; border: 1px solid var(--border-input); border-radius: 6px; background-color: var(--bg-input); height: 38px; overflow: hidden; }
+    .phone-input-wrap:focus-within { border-color: var(--brand-primary); }
+    .phone-input-wrap.input-error { border-color: var(--border-error) !important; }
+    .phone-prefix { background: var(--bg-subtle); padding: 0 10px; font-size: 13px; font-weight: 600; color: var(--brand-primary); border-right: 1px solid var(--border-input); height: 100%; display: flex; align-items: center; user-select: none; }
+    .phone-input-wrap input { border: none; height: 100%; border-radius: 0; padding-left: 8px; }
+
+    .terms-wrap { margin-bottom: 18px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-label); }
+    .terms-wrap input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--brand-primary); cursor: pointer; }
+
+    .dropzone { border: 2px dashed var(--border-input); border-radius: 8px; padding: 28px 16px; text-align: center; cursor: pointer; background: var(--bg-subtle); margin-bottom: 20px; outline: none; transition: all 0.2s ease; }
+    .dropzone:hover { border-color: var(--brand-primary); background: rgba(51, 102, 204, 0.04); }
+    .dropzone span { font-weight: 500; color: var(--text-muted); font-size: 13px; }
+    .dropzone-disabled { opacity: 0.5; pointer-events: none; cursor: not-allowed; }
+    input[type="file"] { display: none; }
+
+    @keyframes fadeInOutModal {
+      0% { opacity: 0; transform: translate(-50%, 20px); }
+      15% { opacity: 1; transform: translate(-50%, 0); }
+      85% { opacity: 1; transform: translate(-50%, 0); }
+      100% { opacity: 0; transform: translate(-50%, -20px); }
+    }
+
+    .toast-success-modal {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      color: #166534;
+      padding: 14px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      z-index: 10000;
+      max-width: 90vw;
+      animation: fadeInOutModal 4.5s ease forwards;
+    }
+    .toast-success-modal .hash-text { font-family: monospace; font-size: 11.5px; color: #15803d; word-break: break-all; }
+
+    .throttle-banner {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; display: none; flex-wrap: wrap; gap: 10px; background: var(--bg-subtle); border: 1px solid var(--border-subtle); padding: 10px 14px; border-radius: 8px; }
+    
+    .toolbar-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .ux-btn { background: var(--bg-card); border: 1px solid var(--border-input); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease; }
+    .ux-btn:hover:not(:disabled) { border-color: var(--brand-primary); background: var(--brand-primary); color: #ffffff; }
+    .ux-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    
+    .divider { width: 1px; height: 24px; background: var(--border-input); margin: 0 4px; }
+    
+    .page-indicator { font-size: 12.5px; font-weight: 500; color: var(--text-label); display: flex; align-items: center; gap: 6px; background: var(--bg-card); padding: 4px 10px; border: 1px solid var(--border-input); border-radius: 6px; }
+    .pdf-page-input { width: 40px; text-align: center; background: var(--bg-input); border: 1px solid var(--border-input); color: var(--brand-primary); border-radius: 4px; padding: 2px; font-size: 12px; outline: none; font-weight: 600; }
+
+    .btn-download-reader { background: var(--brand-primary); color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; display: none; align-items: center; gap: 6px; }
+    .btn-download-reader:hover { background: var(--brand-primary-hover); }
+
+    .viewer-box { position: relative; width: 100%; border: 1px solid var(--border-input); border-radius: 6px; overflow: auto; background: var(--viewer-bg); display: none; text-align: center; max-height: 75vh; padding: 16px; }
+    .pages-cascade-container { display: flex; flex-direction: column; align-items: center; gap: 24px; position: relative; }
+    .canvas-page-wrapper { position: relative; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.12); border-radius: 4px; overflow: hidden; background: #ffffff; }
+    .canvas-page-wrapper canvas { display: block; }
+    
+    .page-label-badge { position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.75); color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; z-index: 5; pointer-events: none; }
+
+    #floatingSignGroup {
+      position: absolute;
+      width: 200px;
+      transform: translate(-50%, -50%);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      z-index: 25;
+      user-select: none;
+    }
+
+    #markerFirma {
+      width: 100%;
+      height: 75px;
+      border: 1.5px dashed #3366CC;
+      background-color: rgba(51, 102, 204, 0.15);
+      border-radius: 6px;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-size: 11px;
+      color: #3366CC;
+      font-weight: 600;
+      padding: 4px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    }
+    #markerFirma:active { cursor: grabbing; }
+    .marker-watermark { font-size: 9px; font-weight: 400; opacity: 0.85; margin-top: 3px; color: #475569; }
+
+    .btn-floating-sign {
+      background: #3366CC;
+      color: #ffffff;
+      border: 1px solid #7099ea;
+      padding: 7px 16px;
+      border-radius: 20px;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(51, 102, 204, 0.25);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: transform 0.1s, background 0.2s;
+    }
+    .btn-floating-sign:hover { background: #274fa8; transform: scale(1.03); }
+
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
+      display: none; justify-content: center; align-items: center; z-index: 9999; padding: 16px;
+    }
+    .modal-card {
+      background: var(--bg-card); border: 1px solid var(--brand-primary); border-radius: 12px;
+      padding: 24px; width: 100%; max-width: 550px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    }
+    .modal-card h3 { margin: 0 0 8px 0; color: var(--brand-primary); font-size: 19px; font-weight: 600; }
+    .modal-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+    
+    .signature-pad-container {
+      width: 100%; height: 200px; background: #ffffff; border: 2px dashed var(--border-input);
+      border-radius: 8px; position: relative; margin-bottom: 20px; cursor: crosshair; touch-action: none;
+    }
+    #canvasFullscreenPad { width: 100%; height: 100%; display: block; border-radius: 6px; }
+    .pad-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; color: #94a3b8; pointer-events: none; font-weight: 400; }
+
+    .modal-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-secondary { background: #64748b; color: #ffffff; border: none; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+    .btn-secondary:hover { background: #475569; }
+    .btn-action-modal { background: #3366CC; color: #ffffff; border: none; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+    .btn-action-modal:hover { background: #274fa8; }
+
+    .otp-input {
+      font-size: 28px; letter-spacing: 8px; text-align: center; font-weight: 600;
+      padding: 8px; width: 85%; margin-bottom: 8px; border-radius: 6px; border: 1.5px solid var(--brand-primary);
+      background: var(--bg-input); color: var(--brand-primary); outline: none;
+    }
+    .otp-error-msg { font-size: 12px; color: var(--color-error); font-weight: 600; min-height: 20px; margin-bottom: 12px; }
+
+    .success-card { 
+      background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; 
+      padding: 32px 24px; margin-top: 24px; display: none; text-align: center; 
+      box-shadow: 0 4px 15px rgba(22, 163, 74, 0.08);
+    }
+    .success-title { font-size: 20px; font-weight: 700; color: #166534; margin-bottom: 8px; }
+    .success-subtitle { font-size: 14px; color: #14532d; margin-bottom: 24px; }
+    
+    .download-countdown-box { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; display: inline-block; margin-bottom: 16px; }
+
+    .btn-download { background: #15803d; color: #ffffff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; transition: background 0.2s; display: none; box-shadow: 0 4px 12px rgba(21, 128, 61, 0.2); }
+    .btn-download:hover { background: #166534; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="top-controls">
+      <div class="right-controls">
+        <button class="btn-control" id="btnForceEn">🇺🇸 English (EN)</button>
+        <button class="btn-control" id="btnNativeCountry">🇨🇴 Colombia</button>
+        
+        <div class="country-selector-wrap">
+          <button class="btn-control" id="btnCountrySelect">🇨🇴 Colombia (+57) ▾</button>
+          <div class="country-dropdown" id="countryDropdown">
+            <div class="country-section-title" id="titleSugeridos">Top 20 Países Sugeridos</div>
+            <div id="listSuggested"></div>
+            <button class="btn-more-countries" id="btnShowAllCountries">Otros países (Catálogo completo)...</button>
+            <div id="listAllCountries" style="display: none; margin-top: 6px;"></div>
+          </div>
+        </div>
+
+        <button class="theme-toggle-btn" id="btnThemeToggle">☀️ Claro</button>
+      </div>
+    </div>
+
+    <h1 id="txtTitulo">Celerdoc — Firmar Documento</h1>
+    <p class="desc" id="txtDesc">Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo para generar el documento certificado.</p>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="tipoDoc" id="lblTipoDoc">Tipo de Documento *</label>
+        <select id="tipoDoc">
+          <option value="CC">CC - Cédula de Ciudadanía / DNI</option>
+          <option value="CE">CE - Cédula de Extranjería</option>
+          <option value="NIT">NIT - Identificación Tributaria / Fiscal</option>
+          <option value="PAS">PAS - Pasaporte Internacional</option>
+          <option value="PER">PER - Permiso Residencia / Visa</option>
+          <option value="OTR">OTR - Otro Documento Oficial</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="nombreTitular" id="lblNombreTitular">Nombre Completo *</label>
+        <input type="text" id="nombreTitular">
+        <div class="error-msg-field" id="errNombre">Nombre obligatorio (mínimo 3 caracteres)</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="numDoc" id="lblNumDoc">Nº de Documento *</label>
+        <input type="text" id="numDoc">
+        <div class="error-msg-field" id="errNumDoc">Documento obligatorio (mínimo 4 caracteres)</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="emailNotif" id="lblEmail">Correo Electrónico *</label>
+        <input type="email" id="emailNotif">
+        <div class="error-msg-field" id="errEmail">Formato de correo inválido</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="whatsappNotif" id="lblWhatsapp">Celular / WhatsApp *</label>
+        <div class="phone-input-wrap" id="wrapPhone">
+          <span class="phone-prefix" id="phonePrefixLabel">+57</span>
+          <input type="text" id="whatsappNotif" maxlength="15">
+        </div>
+        <div class="error-msg-field" id="errPhone">Solo números (mínimo 7 dígitos)</div>
+      </div>
+    </div>
+
+    <div class="terms-wrap">
+      <input type="checkbox" id="chkTerms" checked>
+      <label for="chkTerms" id="lblTerms">Acepto los Términos, Condiciones y Política de Privacidad de Celerdoc.</label>
+    </div>
+
+    <div class="dropzone" id="dropArea" onclick="document.getElementById('fileInput').click()">
+      <span id="txtDrop">Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF</span>
+      <input type="file" id="fileInput" accept="application/pdf">
+    </div>
+
+    <div class="toast-success-modal" id="toastUploadModal">
+      <div>📄 <span id="toastFileName">Documento</span> cargado exitosamente.</div>
+      <div class="hash-text">SHA-256: <span id="toastFileHash">-</span></div>
+    </div>
+
+    <div class="throttle-banner" id="throttleBanner">
+      <span id="throttleText">⏱️ Freno de seguridad activo: esperando 2 segundos para consolidar nueva página...</span>
+      <strong id="throttleCountdown">2s</strong>
+    </div>
+
+    <div class="nav-bar" id="navBar">
+      <div class="toolbar-group">
+        <button class="ux-btn" id="btnZoomOut" title="Reducir zoom">🔍 Reducir</button>
+        <button class="ux-btn" id="btnZoom100" title="Restablecer a 100%">100%</button>
+        <button class="ux-btn" id="btnZoomIn" title="Ampliar zoom">🔍 Ampliar</button>
+        <div class="divider"></div>
+        <button class="ux-btn" id="btnPrimeraPag" title="Ir a la primera página">⏮️ <span id="lblBtnFirst">Primera</span></button>
+        <button class="ux-btn" id="btnAntPag" title="Página anterior">◀️ <span id="lblBtnPrev">Anterior</span></button>
+        <div class="page-indicator">
+          <span id="lblPageText">Pág</span> <input type="number" id="inputNumPag" class="pdf-page-input" min="1" value="1"> <span id="lblOfText">de</span> <span id="lblTotalPagsToolbar">-</span>
+        </div>
+        <button class="ux-btn" id="btnSigPag" title="Página siguiente"><span id="lblBtnNext">Siguiente</span> ▶️</button>
+        <button class="ux-btn" id="btnUltimaPag" title="Ir a la última página"><span id="lblBtnLast">Última</span> ⏭️</button>
+        <div class="divider"></div>
+        <button class="btn-download-reader" id="btnDescargarLectura" title="Descargar documento para lectura detallada">📥 Descargar documento original</button>
+      </div>
+    </div>
+
+    <div class="viewer-box" id="boxViewer">
+      <div class="pages-cascade-container" id="pagesCascadeContainer">
+        <div class="canvas-page-wrapper" id="wrapperPrev">
+          <div class="page-label-badge" id="badgePrev">Anterior</div>
+          <canvas id="canvasPrev"></canvas>
+        </div>
+        <div class="canvas-page-wrapper" id="wrapperActive">
+          <div class="page-label-badge" id="badgeActive">Activa / Nueva</div>
+          <canvas id="canvasEspejo"></canvas>
+          
+          <div id="floatingSignGroup">
+            <div id="markerFirma">
+              <span>✍️ ZONA DE FIRMA</span>
+              <span class="marker-watermark">Arrastra para posicionar</span>
+            </div>
+            <button type="button" class="btn-floating-sign" id="btnFloatingSign">
+              <span>Firmar</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modalSignaturePad">
+      <div class="modal-card">
+        <h3>Realice su Firma</h3>
+        <p>Dibuje su trazo con el dedo o el cursor dentro del recuadro.</p>
+        
+        <div class="signature-pad-container" id="padContainer">
+          <canvas id="canvasFullscreenPad"></canvas>
+          <span class="pad-placeholder" id="fullscreenPadPlaceholder">Trace aquí su firma</span>
+        </div>
+
+        <div class="modal-buttons">
+          <button type="button" class="btn-secondary" id="btnClearFullscreenSignature">Borrar / Modificar</button>
+          <button type="button" class="btn-secondary" id="btnCancelSignatureModal">Cancelar</button>
+          <button type="button" class="btn-action-modal" id="btnConfirmSignatureModal">Firmar y Continuar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOtp">
+      <div class="modal-card">
+        <h3 id="txtOtpTitulo">Verificación de Identidad por OTP</h3>
+        <p id="otpDestinoMsg"></p>
+        <input type="text" id="inputOtp" class="otp-input" maxlength="6" placeholder="______" autocomplete="off" inputmode="numeric">
+        <div class="otp-error-msg" id="otpErrorMsg"></div>
+        <div class="modal-buttons">
+          <button type="button" class="btn-action-modal" id="btnConfirmarOtpManual">Confirmar Código</button>
+          <button type="button" class="btn-secondary" id="btnCancelarOtp">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="success-card" id="successPanel">
+      <div class="success-title" id="txtSuccessTitle">¡Su documento fue firmado con total éxito!</div>
+      <div class="success-subtitle" id="txtSuccessSubtitle">La estampa corporativa y la hoja de auditoría y trazabilidad han sido incorporadas al PDF certificado.</div>
+
+      <div class="download-countdown-box" id="downloadCountdownBox">
+        Preparando su descarga segura... Disponible en <span id="downloadTimerSec">5</span>s
+      </div>
+
+      <div>
+        <button type="button" class="btn-download" id="btnDescargar">Descargar Nuevo PDF Firmado</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const API_URL = "http://127.0.0.1:8000";
+    const CODIGO_OTP_SIMULADO = "123456";
+    const MAX_INTENTOS_OTP = 5;
+    let intentosFallidosOTP = 0;
+
+    let timestampCargaDocUtc = "";
+    let timestampAceptacionTermsUtc = "";
+    let timestampOtpValidadoUtc = "";
+    let timestampTrazoFirmaUtc = "";
+
+    const catalogoPaises = [
+      { codigo: "CO", nombre: "Colombia", indicativo: "+57", bandera: "🇨🇴", lang: "es" },
+      { codigo: "MX", nombre: "México", indicativo: "+52", bandera: "🇲🇽", lang: "es" },
+      { codigo: "ES", nombre: "España", indicativo: "+34", bandera: "🇪🇸", lang: "es" },
+      { codigo: "AR", nombre: "Argentina", indicativo: "+54", bandera: "🇦🇷", lang: "es" },
+      { codigo: "CL", nombre: "Chile", indicativo: "+56", bandera: "🇨🇱", lang: "es" },
+      { codigo: "PE", nombre: "Perú", indicativo: "+51", bandera: "🇵🇪", lang: "es" },
+      { codigo: "EC", nombre: "Ecuador", indicativo: "+593", bandera: "🇪🇨", lang: "es" },
+      { codigo: "GT", nombre: "Guatemala", indicativo: "+502", bandera: "🇬🇹", lang: "es" },
+      { codigo: "CU", nombre: "Cuba", indicativo: "+53", bandera: "🇨🇺", lang: "es" },
+      { codigo: "BO", nombre: "Bolivia", indicativo: "+591", bandera: "🇧🇴", lang: "es" },
+      { codigo: "DO", nombre: "República Dominicana", indicativo: "+1", bandera: "🇩🇴", lang: "es" },
+      { codigo: "HN", nombre: "Honduras", indicativo: "+504", bandera: "🇭🇳", lang: "es" },
+      { codigo: "PY", nombre: "Paraguay", indicativo: "+595", bandera: "🇵🇾", lang: "es" },
+      { codigo: "SV", nombre: "El Salvador", indicativo: "+503", bandera: "🇸🇻", lang: "es" },
+      { codigo: "NI", nombre: "Nicaragua", indicativo: "+505", bandera: "🇳🇮", lang: "es" },
+      { codigo: "CR", nombre: "Costa Rica", indicativo: "+506", bandera: "🇨🇷", lang: "es" },
+      { codigo: "PA", nombre: "Panamá", indicativo: "+507", bandera: "🇵🇦", lang: "es" },
+      { codigo: "UY", nombre: "Uruguay", indicativo: "+598", bandera: "🇺🇾", lang: "es" },
+      { codigo: "PR", nombre: "Puerto Rico", indicativo: "+1", bandera: "🇵🇷", lang: "es" },
+      { codigo: "VE", nombre: "Venezuela", indicativo: "+58", bandera: "🇻🇪", lang: "es" },
+      { codigo: "US", nombre: "United States", indicativo: "+1", bandera: "🇺🇸", lang: "en" },
+      { codigo: "GB", nombre: "United Kingdom", indicativo: "+44", bandera: "🇬🇧", lang: "en" },
+      { codigo: "CA", nombre: "Canada", indicativo: "+1", bandera: "🇨🇦", lang: "en" },
+      { codigo: "AU", nombre: "Australia", indicativo: "+61", bandera: "🇦🇺", lang: "en" },
+      { codigo: "NZ", nombre: "New Zealand", indicativo: "+64", bandera: "🇳🇿", lang: "en" },
+      { codigo: "IE", nombre: "Ireland", indicativo: "+353", bandera: "🇮🇪", lang: "en" },
+      { codigo: "BR", nombre: "Brasil", indicativo: "+55", bandera: "🇧🇷", lang: "pt" },
+      { codigo: "FR", nombre: "France", indicativo: "+33", bandera: "🇫🇷", lang: "fr" },
+      { codigo: "DE", nombre: "Deutschland", indicativo: "+49", bandera: "🇩🇪", lang: "de" },
+      { codigo: "IT", nombre: "Italia", indicativo: "+39", bandera: "🇮🇹", lang: "it" },
+      { codigo: "JP", nombre: "日本 (Japan)", indicativo: "+81", bandera: "🇯🇵", lang: "ja" },
+      { codigo: "CN", nombre: "中国 (China)", indicativo: "+86", bandera: "🇨🇳", lang: "zh" }
+    ];
+
+    const textosIdiomas = {
+      es: {
+        titulo: "Celerdoc — Firmar Documento",
+        desc: "Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo para generar el documento certificado.",
+        lblTipoDoc: "Tipo de Documento *",
+        lblNombreTitular: "Nombre Completo *",
+        lblNumDoc: "Nº de Documento *",
+        lblEmail: "Correo Electrónico *",
+        lblWhatsapp: "Celular / WhatsApp *",
+        lblTerms: "Acepto los Términos, Condiciones y Política de Privacidad de Celerdoc.",
+        dropText: "Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF",
+        lblBtnFirmar: "Firmar",
+        otpTitulo: "Verificación de Identidad por OTP",
+        btnCancelarOtp: "Cancelar",
+        btnDescargar: "Descargar Nuevo PDF Firmado",
+        sugeridosTitulo: "Top 20 Países Sugeridos",
+        verTodos: "Otros países (Catálogo completo)...",
+        zoomIn: "🔍 Ampliar",
+        zoomOut: "🔍 Reducir",
+        first: "Primera",
+        prev: "Anterior",
+        next: "Siguiente",
+        last: "Última",
+        pageText: "Pág",
+        ofText: "de",
+        downloadReader: "📥 Descargar documento original",
+        badgePrev: "Página Anterior",
+        badgeActive: "Página Activa / Nueva",
+        docs: [
+          { val: "CC", text: "CC - Cédula de Ciudadanía / DNI" },
+          { val: "CE", text: "CE - Cédula de Extranjería" },
+          { val: "NIT", text: "NIT - Identificación Tributaria / Fiscal" },
+          { val: "PAS", text: "PAS - Pasaporte Internacional" },
+          { val: "PER", text: "PER - Permiso Residencia / Visa" },
+          { val: "OTR", text: "OTR - Otro Documento Oficial" }
+        ]
+      },
+      en: {
+        titulo: "Celerdoc — Sign Document",
+        desc: "Upload original document, place signature point, fill required fields and draw your signature to generate certified document.",
+        lblTipoDoc: "Document Type *",
+        lblNombreTitular: "Full Signer Name *",
+        lblNumDoc: "Document Number *",
+        lblEmail: "Corporate Email *",
+        lblWhatsapp: "Mobile / WhatsApp *",
+        lblTerms: "I accept Celerdoc Terms, Conditions, and Privacy Policy.",
+        dropText: "Click, drag, or paste (Ctrl+V) your PDF file here",
+        lblBtnFirmar: "Sign",
+        otpTitulo: "Identity Verification via OTP",
+        btnCancelarOtp: "Cancel",
+        btnDescargar: "Download New Signed PDF",
+        sugeridosTitulo: "Top 20 Suggested Countries",
+        verTodos: "Other countries (Full catalog)...",
+        zoomIn: "🔍 Zoom In",
+        zoomOut: "🔍 Zoom Out",
+        first: "First",
+        prev: "Prev",
+        next: "Next",
+        last: "Last",
+        pageText: "Page",
+        ofText: "of",
+        downloadReader: "📥 Download original document",
+        badgePrev: "Previous Page",
+        badgeActive: "Active / New Page",
+        docs: [
+          { val: "CC", text: "CC - National ID / DNI" },
+          { val: "CE", text: "CE - Foreign ID Card" },
+          { val: "NIT", text: "NIT - Tax ID / Fiscal ID (RFC/EIN)" },
+          { val: "PAS", text: "PAS - Passport" },
+          { val: "PER", text: "PER - Special Permit / Work Visa" },
+          { val: "OTR", text: "OTR - Other Official Document" }
+        ]
+      }
+    };
+
+    let idiomaActivo = 'es';
+    let paisActivo = catalogoPaises[0];
+    let paisNativoDetectado = catalogoPaises[0];
+    let temaActual = 'light';
+    let escalaActual = 1.2;
+    let rawCoords = { lat: null, lon: null };
+
+    function capturarGeolocalizacion() {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            rawCoords.lat = pos.coords.latitude;
+            rawCoords.lon = pos.coords.longitude;
+          },
+          () => {},
+          { timeout: 8000, enableHighAccuracy: true }
+        );
+      }
+    }
+
+    const inputNombre = document.getElementById('nombreTitular');
+    const inputNumDoc = document.getElementById('numDoc');
+    const inputEmail = document.getElementById('emailNotif');
+    const inputPhone = document.getElementById('whatsappNotif');
+    const wrapPhone = document.getElementById('wrapPhone');
+    const selectTipoDoc = document.getElementById('tipoDoc');
+    const chkTerms = document.getElementById('chkTerms');
+
+    const errNombre = document.getElementById('errNombre');
+    const errNumDoc = document.getElementById('errNumDoc');
+    const errEmail = document.getElementById('errEmail');
+    const errPhone = document.getElementById('errPhone');
+
+    inputNombre.addEventListener('input', () => {
+      inputNombre.value = inputNombre.value.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
+      validarCampoNombre();
+    });
+
+    function validarCampoNombre() {
+      const val = inputNombre.value.trim();
+      const valido = val.length >= 3;
+      inputNombre.classList.toggle('input-error', !valido);
+      errNombre.style.display = valido ? 'none' : 'block';
+      return valido;
+    }
+
+    inputNumDoc.addEventListener('input', () => {
+      inputNumDoc.value = inputNumDoc.value.replace(/[^a-zA-Z0-9.-]/g, '');
+      validarCampoNumDoc();
+    });
+
+    function validarCampoNumDoc() {
+      const val = inputNumDoc.value.trim();
+      const valido = val.length >= 4;
+      inputNumDoc.classList.toggle('input-error', !valido);
+      errNumDoc.style.display = valido ? 'none' : 'block';
+      return valido;
+    }
+
+    inputEmail.addEventListener('input', validarCampoEmail);
+
+    function validarCampoEmail() {
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const valido = emailPattern.test(inputEmail.value.trim());
+      inputEmail.classList.toggle('input-error', !valido);
+      errEmail.style.display = valido ? 'none' : 'block';
+      return valido;
+    }
+
+    inputPhone.addEventListener('input', () => {
+      inputPhone.value = inputPhone.value.replace(/\D/g, '');
+      validarCampoPhone();
+    });
+
+    function validarCampoPhone() {
+      const val = inputPhone.value.trim();
+      const valido = val.length >= 7 && val.length <= 15;
+      wrapPhone.classList.toggle('input-error', !valido);
+      errPhone.style.display = valido ? 'none' : 'block';
+      return valido;
+    }
+
+    function validarFormularioCompleto() {
+      const v1 = validarCampoNombre();
+      const v2 = validarCampoNumDoc();
+      const v3 = validarCampoEmail();
+      const v4 = validarCampoPhone();
+      if (!chkTerms.checked) {
+        alert("Debe aceptar los Términos, Condiciones y Política de Privacidad.");
+        return false;
+      }
+      return (v1 && v2 && v3 && v4);
+    }
+
+    const btnThemeToggle = document.getElementById('btnThemeToggle');
+    btnThemeToggle.addEventListener('click', () => {
+      temaActual = (temaActual === 'light') ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', temaActual);
+      btnThemeToggle.textContent = (temaActual === 'light') ? '☀️ Claro' : '🌙 Oscuro';
+    });
+
+    const btnCountrySelect = document.getElementById('btnCountrySelect');
+    const countryDropdown = document.getElementById('countryDropdown');
+    const listSuggested = document.getElementById('listSuggested');
+    const listAllCountries = document.getElementById('listAllCountries');
+    const btnShowAllCountries = document.getElementById('btnShowAllCountries');
+
+    btnCountrySelect.addEventListener('click', (e) => {
+      e.stopPropagation();
+      countryDropdown.classList.toggle('open');
+    });
+
+    document.addEventListener('click', () => {
+      countryDropdown.classList.remove('open');
+    });
+
+    btnShowAllCountries.addEventListener('click', (e) => {
+      e.stopPropagation();
+      listAllCountries.style.display = listAllCountries.style.display === 'none' ? 'block' : 'none';
+      btnShowAllCountries.textContent = listAllCountries.style.display === 'none' ? textosIdiomas[idiomaActivo].verTodos : '▲ Ocultar lista';
+    });
+
+    function seleccionarPais(pais) {
+      paisActivo = pais;
+      btnCountrySelect.textContent = `${pais.bandera} ${pais.nombre} (${pais.indicativo}) ▾`;
+      document.getElementById('phonePrefixLabel').textContent = pais.indicativo;
+      countryDropdown.classList.remove('open');
+      
+      if (pais.lang === 'es' || pais.lang === 'en') {
+        aplicarIdioma(pais.lang);
+      } else {
+        aplicarIdioma('en');
+      }
+    }
+
+    function renderSelectorPaises() {
+      listSuggested.innerHTML = '';
+      listAllCountries.innerHTML = '';
+
+      const sugeridos = catalogoPaises.filter(p => p.lang === idiomaActivo).slice(0, 20);
+      const otros = catalogoPaises.filter(p => !sugeridos.includes(p));
+
+      sugeridos.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'country-item';
+        item.innerHTML = `<span>${p.bandera} ${p.nombre}</span><span class="indicativo">${p.indicativo}</span>`;
+        item.onclick = () => seleccionarPais(p);
+        listSuggested.appendChild(item);
+      });
+
+      otros.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'country-item';
+        item.innerHTML = `<span>${p.bandera} ${p.nombre}</span><span class="indicativo">${p.indicativo}</span>`;
+        item.onclick = () => seleccionarPais(p);
+        listAllCountries.appendChild(item);
+      });
+    }
+
+    function aplicarIdioma(lang) {
+      idiomaActivo = (textosIdiomas[lang]) ? lang : 'en';
+      const t = textosIdiomas[idiomaActivo];
+
+      document.getElementById('txtTitulo').textContent = t.titulo;
+      document.getElementById('txtDesc').textContent = t.desc;
+      document.getElementById('lblTipoDoc').textContent = t.lblTipoDoc;
+      document.getElementById('lblNombreTitular').textContent = t.lblNombreTitular;
+      document.getElementById('lblNumDoc').textContent = t.lblNumDoc;
+      document.getElementById('lblEmail').textContent = t.lblEmail;
+      document.getElementById('lblWhatsapp').textContent = t.lblWhatsapp;
+      document.getElementById('lblTerms').textContent = t.lblTerms;
+      if (!datosTrazabilidad.nombre_archivo) {
+        document.getElementById('txtDrop').textContent = t.dropText;
+      }
+      document.getElementById('txtOtpTitulo').textContent = t.otpTitulo;
+      document.getElementById('btnCancelarOtp').textContent = t.btnCancelarOtp;
+      document.getElementById('btnDescargar').textContent = t.btnDescargar;
+      document.getElementById('titleSugeridos').textContent = t.sugeridosTitulo;
+      btnShowAllCountries.textContent = t.verTodos;
+
+      document.getElementById('btnZoomIn').innerHTML = t.zoomIn;
+      document.getElementById('btnZoomOut').innerHTML = t.zoomOut;
+      document.getElementById('lblBtnFirst').textContent = t.first;
+      document.getElementById('lblBtnPrev').textContent = t.prev;
+      document.getElementById('lblBtnNext').textContent = t.next;
+      document.getElementById('lblBtnLast').textContent = t.last;
+      document.getElementById('lblPageText').textContent = t.pageText;
+      document.getElementById('lblOfText').textContent = t.ofText;
+      document.getElementById('btnDescargarLectura').textContent = t.downloadReader;
+      document.getElementById('badgePrev').textContent = t.badgePrev;
+      document.getElementById('badgeActive').textContent = t.badgeActive;
+
+      const selDoc = document.getElementById('tipoDoc');
+      const valPrevio = selDoc.value || "CC";
+      selDoc.innerHTML = '';
+      t.docs.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.val;
+        opt.textContent = d.text;
+        selDoc.appendChild(opt);
+      });
+      selDoc.value = valPrevio;
+
+      renderSelectorPaises();
+    }
+
+    document.getElementById('btnForceEn').addEventListener('click', () => {
+      const paisUs = catalogoPaises.find(p => p.codigo === 'US');
+      if (paisUs) seleccionarPais(paisUs);
+    });
+
+    document.getElementById('btnNativeCountry').addEventListener('click', () => {
+      seleccionarPais(paisNativoDetectado);
+    });
+
+    function detectarNavegador() {
+      const locale = navigator.language || (navigator.languages && navigator.languages[0]) || 'es-CO';
+      const langCode = locale.split('-')[0].toLowerCase();
+      const countryCode = locale.includes('-') ? locale.split('-')[1].toUpperCase() : '';
+
+      paisNativoDetectado = catalogoPaises.find(p => p.codigo === countryCode) || catalogoPaises.find(p => p.lang === langCode) || catalogoPaises[0];
+      
+      document.getElementById('btnNativeCountry').textContent = `${paisNativoDetectado.bandera} ${paisNativoDetectado.nombre}`;
+      
+      const idiomaFinal = (textosIdiomas[langCode]) ? langCode : 'en';
+      aplicarIdioma(idiomaFinal);
+      seleccionarPais(paisNativoDetectado);
+      capturarGeolocalizacion();
+    }
+
+    let pdfActual = null;
+    let base64String = '';
+    let blobOriginalUrl = '';
+    let paginasExtraEnBlanco = 0;
+    
+    let throttleTimerActive = false;
+    let throttleTimeoutId = null;
+    let countdownIntervalId = null;
+
+    let datosTrazabilidad = {
+      nombre_archivo: '',
+      sha256_original: '',
+      timestamp_utc: '',
+      total_paginas: 0,
+      pagina_activa: 0,
+      coordenadas: { x_pct: null, y_pct: null },
+      trazo_firma_png: ''
+    };
+    let descargaUrlActual = '';
+    let nombreArchivoFinalGlobal = '';
+
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+    const txtDrop = document.getElementById('txtDrop');
+    const toastUploadModal = document.getElementById('toastUploadModal');
+    const toastFileName = document.getElementById('toastFileName');
+    const toastFileHash = document.getElementById('toastFileHash');
+    const throttleBanner = document.getElementById('throttleBanner');
+    const throttleCountdown = document.getElementById('throttleCountdown');
+    const navBar = document.getElementById('navBar');
+    const boxViewer = document.getElementById('boxViewer');
+    
+    const canvasActive = document.getElementById('canvasEspejo');
+    const ctxActive = canvasActive.getContext('2d');
+    const canvasPrev = document.getElementById('canvasPrev');
+    const ctxPrev = canvasPrev.getContext('2d');
+    const wrapperPrev = document.getElementById('wrapperPrev');
+
+    const floatingSignGroup = document.getElementById('floatingSignGroup');
+    const markerFirma = document.getElementById('markerFirma');
+    const btnFloatingSign = document.getElementById('btnFloatingSign');
+    
+    const modalSignaturePad = document.getElementById('modalSignaturePad');
+    const padContainer = document.getElementById('padContainer');
+    const canvasFullscreenPad = document.getElementById('canvasFullscreenPad');
+    const ctxFullscreenPad = canvasFullscreenPad.getContext('2d');
+    const fullscreenPadPlaceholder = document.getElementById('fullscreenPadPlaceholder');
+    const btnClearFullscreenSignature = document.getElementById('btnClearFullscreenSignature');
+    const btnCancelSignatureModal = document.getElementById('btnCancelSignatureModal');
+    const btnConfirmSignatureModal = document.getElementById('btnConfirmSignatureModal');
+    let isDrawingFullscreen = false;
+    let haCompletadoTrazo = false;
+
+    const modalOtp = document.getElementById('modalOtp');
+    const inputOtp = document.getElementById('inputOtp');
+    const otpErrorMsg = document.getElementById('otpErrorMsg');
+    const btnConfirmarOtpManual = document.getElementById('btnConfirmarOtpManual');
+    const btnCancelarOtp = document.getElementById('btnCancelarOtp');
+    const successPanel = document.getElementById('successPanel');
+    const btnDescargar = document.getElementById('btnDescargar');
+    const btnDescargarLectura = document.getElementById('btnDescargarLectura');
+
+    const btnZoomOut = document.getElementById('btnZoomOut');
+    const btnZoom100 = document.getElementById('btnZoom100');
+    const btnZoomIn = document.getElementById('btnZoomIn');
+    const btnPrimeraPag = document.getElementById('btnPrimeraPag');
+    const btnAntPag = document.getElementById('btnAntPag');
+    const btnSigPag = document.getElementById('btnSigPag');
+    const btnUltimaPag = document.getElementById('btnUltimaPag');
+    const inputNumPag = document.getElementById('inputNumPag');
+    const lblTotalPagsToolbar = document.getElementById('lblTotalPagsToolbar');
+
+    function ajustarTamanoCanvasFullscreen() {
+      const rect = padContainer.getBoundingClientRect();
+      canvasFullscreenPad.width = rect.width;
+      canvasFullscreenPad.height = rect.height;
+      ctxFullscreenPad.lineWidth = 2.5;
+      ctxFullscreenPad.lineCap = 'round';
+      ctxFullscreenPad.lineJoin = 'round';
+      ctxFullscreenPad.strokeStyle = '#0f172a';
+    }
+
+    function empezarDibujoFullscreen(e) {
+      isDrawingFullscreen = true;
+      fullscreenPadPlaceholder.style.display = 'none';
+      haCompletadoTrazo = true;
+      const pos = obtenerCoordenadasFullscreen(e);
+      ctxFullscreenPad.beginPath();
+      ctxFullscreenPad.moveTo(pos.x, pos.y);
+      if (e.cancelable) e.preventDefault();
+    }
+
+    function trazarFullscreen(e) {
+      if (!isDrawingFullscreen) return;
+      const pos = obtenerCoordenadasFullscreen(e);
+      ctxFullscreenPad.lineTo(pos.x, pos.y);
+      ctxFullscreenPad.stroke();
+      if (e.cancelable) e.preventDefault();
+    }
+
+    function terminarDibujoFullscreen(e) {
+      if (isDrawingFullscreen) {
+        isDrawingFullscreen = false;
+        datosTrazabilidad.trazo_firma_png = canvasFullscreenPad.toDataURL('image/png');
+        timestampTrazoFirmaUtc = new Date().toISOString();
+      }
+    }
+
+    function obtenerCoordenadasFullscreen(e) {
+      const rect = canvasFullscreenPad.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+    }
+
+    canvasFullscreenPad.addEventListener('mousedown', empezarDibujoFullscreen);
+    canvasFullscreenPad.addEventListener('mousemove', trazarFullscreen);
+    window.addEventListener('mouseup', terminarDibujoFullscreen);
+
+    canvasFullscreenPad.addEventListener('touchstart', empezarDibujoFullscreen, { passive: false });
+    canvasFullscreenPad.addEventListener('touchmove', trazarFullscreen, { passive: false });
+    window.addEventListener('touchend', terminarDibujoFullscreen);
+
+    btnClearFullscreenSignature.addEventListener('click', (e) => {
+      e.stopPropagation();
+      ctxFullscreenPad.clearRect(0, 0, canvasFullscreenPad.width, canvasFullscreenPad.height);
+      fullscreenPadPlaceholder.style.display = 'block';
+      haCompletadoTrazo = false;
+      datosTrazabilidad.trazo_firma_png = '';
+    });
+
+    btnCancelSignatureModal.addEventListener('click', (e) => {
+      e.stopPropagation();
+      modalSignaturePad.style.display = 'none';
+    });
+
+    btnConfirmSignatureModal.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!haCompletadoTrazo) {
+        alert("Por favor realice su trazo de firma antes de continuar.");
+        return;
+      }
+      modalSignaturePad.style.display = 'none';
+      
+      const tel = inputPhone.value.trim();
+      const email = inputEmail.value.trim();
+      const ind = paisActivo.indicativo;
+
+      document.getElementById('otpDestinoMsg').innerHTML = `Código de seguridad enviado a: <strong>${ind} ${tel}</strong> / <strong>${email}</strong><br><br><span style="color: var(--brand-primary); font-weight: 600;">(Código de prueba: 123456)</span>`;
+      inputOtp.value = '';
+      otpErrorMsg.textContent = '';
+      modalOtp.style.display = 'flex';
+      setTimeout(() => inputOtp.focus(), 100);
+    });
+
+    async function procesarArchivoPDF(archivo) {
+      if (!archivo || (archivo.type && archivo.type !== 'application/pdf')) {
+        alert("Por favor seleccione o pegue un archivo PDF válido.");
+        return;
+      }
+
+      datosTrazabilidad.nombre_archivo = archivo.name || "documento.pdf";
+      timestampCargaDocUtc = new Date().toISOString();
+      datosTrazabilidad.timestamp_utc = timestampCargaDocUtc;
+      txtDrop.textContent = `Archivo cargado: ${datosTrazabilidad.nombre_archivo}`;
+
+      blobOriginalUrl = URL.createObjectURL(archivo);
+      paginasExtraEnBlanco = 0;
+      throttleTimerActive = false;
+
+      const arrayBuffer = await archivo.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      base64String = btoa(binary);
+
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      datosTrazabilidad.sha256_original = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      pdfActual = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      datosTrazabilidad.total_paginas = pdfActual.numPages;
+
+      toastFileName.textContent = datosTrazabilidad.nombre_archivo;
+      toastFileHash.textContent = datosTrazabilidad.sha256_original;
+      toastUploadModal.style.display = 'flex';
+      setTimeout(() => {
+        toastUploadModal.style.display = 'none';
+      }, 4500);
+
+      lblTotalPagsToolbar.textContent = pdfActual.numPages;
+      inputNumPag.max = pdfActual.numPages;
+      
+      navBar.style.display = 'flex';
+      boxViewer.style.display = 'block';
+
+      if (pdfActual.numPages > 100) {
+        btnDescargarLectura.style.display = 'inline-flex';
+      } else {
+        btnDescargarLectura.style.display = 'none';
+      }
+
+      irAPagina(pdfActual.numPages);
+    }
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) procesarArchivoPDF(e.target.files[0]);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, (e) => { e.preventDefault(); });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, (e) => { e.preventDefault(); });
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) procesarArchivoPDF(files[0]);
+    });
+
+    window.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || window.clipboardData).items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file') {
+          const blob = items[i].getAsFile();
+          procesarArchivoPDF(blob);
+          break;
+        }
+      }
+    });
+
+    function verificarYLiberarPaginaExtra() {
+      if (paginasExtraEnBlanco > 0) {
+        const maxOriginal = pdfActual.numPages;
+        if (datosTrazabilidad.pagina_activa <= maxOriginal) {
+          paginasExtraEnBlanco = 0;
+          lblTotalPagsToolbar.textContent = maxOriginal;
+          inputNumPag.max = maxOriginal;
+        }
+      }
+    }
+
+    function irAPagina(num) {
+      if (!pdfActual) return;
+      const maxPaginasTotal = pdfActual.numPages + paginasExtraEnBlanco;
+
+      if (num < 1) num = 1;
+      if (num > maxPaginasTotal) num = maxPaginasTotal;
+      
+      datosTrazabilidad.pagina_activa = num;
+      inputNumPag.value = num;
+      
+      btnPrimeraPag.disabled = (num === 1);
+      btnAntPag.disabled = (num === 1);
+      btnSigPag.disabled = (num === maxPaginasTotal);
+      btnUltimaPag.disabled = (num === maxPaginasTotal);
+
+      renderizarVisualizadorCascade(num);
+    }
+
+    btnPrimeraPag.addEventListener('click', () => irAPagina(1));
+    btnUltimaPag.addEventListener('click', () => irAPagina(pdfActual.numPages + paginasExtraEnBlanco));
+    btnAntPag.addEventListener('click', () => irAPagina(datosTrazabilidad.pagina_activa - 1));
+    btnSigPag.addEventListener('click', () => irAPagina(datosTrazabilidad.pagina_activa + 1));
+    inputNumPag.addEventListener('change', (e) => irAPagina(parseInt(e.target.value) || 1));
+
+    btnZoomIn.addEventListener('click', () => {
+      if (escalaActual < 2.5) {
+        escalaActual += 0.2;
+        renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
+      }
+    });
+
+    btnZoom100.addEventListener('click', () => {
+      escalaActual = 1.0;
+      renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
+    });
+
+    btnZoomOut.addEventListener('click', () => {
+      if (escalaActual > 0.6) {
+        escalaActual -= 0.2;
+        renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
+      }
+    });
+
+    btnDescargarLectura.addEventListener('click', () => {
+      if (blobOriginalUrl) {
+        const a = document.createElement('a');
+        a.href = blobOriginalUrl;
+        a.download = datosTrazabilidad.nombre_archivo || "documento_original.pdf";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    });
+
+    async function renderizarVisualizadorCascade(numPagina) {
+      if (numPagina <= pdfActual.numPages) {
+        const pageAct = await pdfActual.getPage(numPagina);
+        const vpAct = pageAct.getViewport({ scale: escalaActual });
+        canvasActive.width = vpAct.width;
+        canvasActive.height = vpAct.height;
+        await pageAct.render({ canvasContext: ctxActive, viewport: vpAct }).promise;
+      } else {
+        const pageRef = await pdfActual.getPage(pdfActual.numPages);
+        const vpRef = pageRef.getViewport({ scale: escalaActual });
+        canvasActive.width = vpRef.width;
+        canvasActive.height = vpRef.height;
+        ctxActive.fillStyle = (temaActual === 'dark') ? '#1e293b' : '#ffffff';
+        ctxActive.fillRect(0, 0, canvasActive.width, canvasActive.height);
+      }
+
+      if (numPagina > 1) {
+        wrapperPrev.style.display = 'block';
+        const numPrev = numPagina - 1;
+        if (numPrev <= pdfActual.numPages) {
+          const pagePrev = await pdfActual.getPage(numPrev);
+          const vpPrev = pagePrev.getViewport({ scale: escalaActual });
+          canvasPrev.width = vpPrev.width;
+          canvasPrev.height = vpPrev.height;
+          await pagePrev.render({ canvasContext: ctxPrev, viewport: vpPrev }).promise;
+        } else {
+          const pageRef = await pdfActual.getPage(pdfActual.numPages);
+          const vpRef = pageRef.getViewport({ scale: escalaActual });
+          canvasPrev.width = vpRef.width;
+          canvasPrev.height = vpRef.height;
+          ctxPrev.fillStyle = (temaActual === 'dark') ? '#1e293b' : '#ffffff';
+          ctxPrev.fillRect(0, 0, canvasPrev.width, canvasPrev.height);
+        }
+      } else {
+        wrapperPrev.style.display = 'none';
+      }
+
+      if (!datosTrazabilidad.coordenadas.x_pct || datosTrazabilidad.pagina_activa !== numPagina) {
+        const defaultX = canvasActive.width / 2;
+        const defaultY = canvasActive.height - 90;
+        floatingSignGroup.style.left = `${defaultX}px`;
+        floatingSignGroup.style.top = `${defaultY}px`;
+        floatingSignGroup.style.display = 'flex';
+        
+        datosTrazabilidad.coordenadas = {
+          x_pct: parseFloat(((defaultX / canvasActive.width) * 100).toFixed(2)),
+          y_pct: parseFloat(((defaultY / canvasActive.height) * 100).toFixed(2))
+        };
+      } else {
+        const posX = (datosTrazabilidad.coordenadas.x_pct / 100) * canvasActive.width;
+        const posY = (datosTrazabilidad.coordenadas.y_pct / 100) * canvasActive.height;
+        floatingSignGroup.style.left = `${posX}px`;
+        floatingSignGroup.style.top = `${posY}px`;
+        floatingSignGroup.style.display = 'flex';
+      }
+    }
+
+    let isDraggingMarker = false;
+
+    markerFirma.addEventListener('mousedown', (e) => {
+      isDraggingMarker = true;
+      e.stopPropagation();
+    });
+
+    markerFirma.addEventListener('touchstart', (e) => {
+      isDraggingMarker = true;
+      e.stopPropagation();
+    }, { passive: true });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDraggingMarker) return;
+      actualizarPosicionMarcador(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isDraggingMarker) return;
+      const touch = e.touches[0];
+      actualizarPosicionMarcador(touch.clientX, touch.clientY);
+    }, { passive: true });
+
+    window.addEventListener('mouseup', () => { isDraggingMarker = false; });
+    window.addEventListener('touchend', () => { isDraggingMarker = false; });
+
+    function actualizarPosicionMarcador(clientX, clientY) {
+      const rect = canvasActive.getBoundingClientRect();
+      let clickX = clientX - rect.left;
+      let clickY = clientY - rect.top;
+
+      if (clickY > rect.height) {
+        if (paginasExtraEnBlanco === 0) {
+          paginasExtraEnBlanco = 1;
+          const nuevoTotal = pdfActual.numPages + paginasExtraEnBlanco;
+          lblTotalPagsToolbar.textContent = nuevoTotal;
+          inputNumPag.max = nuevoTotal;
+          datosTrazabilidad.coordenadas.y_pct = 15.0; 
+          irAPagina(nuevoTotal);
+          return;
+        } else {
+          if (!throttleTimerActive) {
+            throttleTimerActive = true;
+            let tiempoRestante = 2;
+            
+            throttleBanner.style.display = 'flex';
+            throttleCountdown.textContent = `${tiempoRestante}s`;
+            
+            countdownIntervalId = setInterval(() => {
+              tiempoRestante -= 1;
+              if (tiempoRestante > 0) {
+                throttleCountdown.textContent = `${tiempoRestante}s`;
+                document.getElementById('throttleText').textContent = `⏱️ Freno de seguridad activo: esperando ${tiempoRestante}s para consolidar nueva página...`;
+              } else {
+                clearInterval(countdownIntervalId);
+              }
+            }, 1000);
+
+            throttleTimeoutId = setTimeout(() => {
+              throttleBanner.style.display = 'none';
+              throttleTimerActive = false;
+              
+              paginasExtraEnBlanco += 1;
+              const nuevoTotal = pdfActual.numPages + paginasExtraEnBlanco;
+              lblTotalPagsToolbar.textContent = nuevoTotal;
+              inputNumPag.max = nuevoTotal;
+              
+              datosTrazabilidad.coordenadas.y_pct = 15.0; 
+              irAPagina(nuevoTotal);
+            }, 2000);
+          }
+          return;
+        }
+      } else {
+        if (throttleTimerActive) {
+          clearTimeout(throttleTimeoutId);
+          clearInterval(countdownIntervalId);
+          throttleBanner.style.display = 'none';
+          throttleTimerActive = false;
+        }
+      }
+
+      if (clickY < 0 && datosTrazabilidad.pagina_activa > 1) {
+        irAPagina(datosTrazabilidad.pagina_activa - 1);
+        verificarYLiberarPaginaExtra();
+        return;
+      }
+
+      if (clickX < 0) clickX = 0;
+      if (clickX > rect.width) clickX = rect.width;
+      if (clickY < 0) clickY = 0;
+      if (clickY > rect.height) clickY = rect.height;
+
+      datosTrazabilidad.coordenadas = {
+        x_pct: parseFloat(((clickX / rect.width) * 100).toFixed(2)),
+        y_pct: parseFloat(((clickY / rect.height) * 100).toFixed(2))
+      };
+
+      floatingSignGroup.style.left = `${clickX}px`;
+      floatingSignGroup.style.top = `${clickY}px`;
+      floatingSignGroup.style.display = 'flex';
+
+      verificarYLiberarPaginaExtra();
+    }
+
+    btnFloatingSign.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (!pdfActual) {
+        alert("Por favor cargue un documento PDF antes de continuar.");
+        return;
+      }
+
+      if (!validarFormularioCompleto()) {
+        alert("Por favor complete correctamente todos los campos obligatorios antes de firmar.");
+        return;
+      }
+
+      timestampAceptacionTermsUtc = new Date().toISOString();
+
+      modalSignaturePad.style.display = 'flex';
+      setTimeout(() => {
+        ajustarTamanoCanvasFullscreen();
+      }, 50);
+    });
+
+    btnCancelarOtp.addEventListener('click', () => {
+      modalOtp.style.display = 'none';
+    });
+
+    function verificarYEjecutarOtp() {
+      const codigo = inputOtp.value.trim();
+      if (codigo === CODIGO_OTP_SIMULADO) {
+        timestampOtpValidadoUtc = new Date().toISOString();
+        otpErrorMsg.textContent = '';
+        modalOtp.style.display = 'none';
+        ejecutarProcesoFirmaBackend(codigo);
+      } else {
+        intentosFallidosOTP += 1;
+        const restantes = MAX_INTENTOS_OTP - intentosFallidosOTP;
+        
+        if (intentosFallidosOTP >= MAX_INTENTOS_OTP) {
+          alert("Has superado el límite de 5 intentos fallidos. Por seguridad la sesión se cancelará.");
+          location.reload();
+        } else {
+          otpErrorMsg.textContent = `Código OTP incorrecto. Le quedan ${restantes} intento(s).`;
+          inputOtp.value = '';
+          inputOtp.focus();
+        }
+      }
+    }
+
+    inputOtp.addEventListener('input', () => {
+      inputOtp.value = inputOtp.value.replace(/\D/g, '');
+      if (inputOtp.value.length === 6) {
+        verificarYEjecutarOtp();
+      }
+    });
+
+    btnConfirmarOtpManual.addEventListener('click', (e) => {
+      e.stopPropagation();
+      verificarYEjecutarOtp();
+    });
+
+    async function ejecutarProcesoFirmaBackend(codigoOtpValido) {
+      floatingSignGroup.style.display = 'none';
+      dropArea.classList.add('dropzone-disabled');
+      fileInput.disabled = true;
+      inputNombre.disabled = true;
+      inputNumDoc.disabled = true;
+      inputEmail.disabled = true;
+      inputPhone.disabled = true;
+      selectTipoDoc.disabled = true;
+      chkTerms.disabled = true;
+
+      const tipoDocVal = selectTipoDoc.value;
+      const tipoDocTexto = selectTipoDoc.options[selectTipoDoc.selectedIndex].text;
+      const nombreTitular = inputNombre.value.trim();
+      const numDocLimpio = inputNumDoc.value.trim().replace(/[^a-zA-Z0-9]/g, '');
+      const email = inputEmail.value.trim();
+      const ind = paisActivo.indicativo;
+      const whatsapp = `${ind} ${inputPhone.value.trim()}`;
+
+      const ahora = new Date();
+      const anio = ahora.getFullYear();
+      const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+      const dia = String(ahora.getDate()).padStart(2, '0');
+      const hora = String(ahora.getHours()).padStart(2, '0');
+      const min = String(ahora.getMinutes()).padStart(2, '0');
+      const seg = String(ahora.getSeconds()).padStart(2, '0');
+      const stampLimpio = `${anio}${mes}${dia}${hora}${min}${seg}`;
+
+      const nombreBaseSinExt = datosTrazabilidad.nombre_archivo.replace(/\.[^/.]+$/, "");
+      // Nomenclatura con un solo guion bajo separando el nombre del sufijo continuo
+      nombreArchivoFinalGlobal = `${nombreBaseSinExt}_${tipoDocVal}${numDocLimpio}${stampLimpio}.pdf`;
+
+      const payload = {
+        nombre_archivo: datosTrazabilidad.nombre_archivo,
+        nombre_final_sugerido: nombreArchivoFinalGlobal,
+        archivo_base64: base64String,
+        tipo_documento: tipoDocTexto,
+        codigo_tipo_doc: tipoDocVal,
+        numero_documento: inputNumDoc.value.trim(),
+        nombre_firmante: nombreTitular,
+        latitud_raw: rawCoords.lat,
+        longitud_raw: rawCoords.lon,
+        trazo_firma_base64: datosTrazabilidad.trazo_firma_png,
+        total_firmantes: 1,
+        pagina_seleccionada: datosTrazabilidad.pagina_activa,
+        total_paginas_con_extras: pdfActual.numPages + paginasExtraEnBlanco,
+        coordenadas: datosTrazabilidad.coordenadas,
+        email_notificacion: email,
+        whatsapp_notificacion: whatsapp,
+        timestamp_carga_doc: timestampCargaDocUtc,
+        timestamp_terminos: timestampAceptacionTermsUtc,
+        timestamp_trazo: timestampTrazoFirmaUtc,
+        timestamp_otp: timestampOtpValidadoUtc,
+        sha256_original: datosTrazabilidad.sha256_original,
+        codigo_otp_validado: codigoOtpValido,
+        user_agent: navigator.userAgent
+      };
+
+      try {
+        const resp = await fetch(`${API_URL}/procesar-firma`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) throw new Error("Error en el servidor al firmar");
+
+        const data = await resp.json();
+        descargaUrlActual = `${API_URL}${data.datos_archivo.ruta_descarga}`;
+        if (data.datos_archivo.nombre_final) {
+          nombreArchivoFinalGlobal = data.datos_archivo.nombre_final;
+        }
+
+        successPanel.style.display = 'block';
+        successPanel.scrollIntoView({ behavior: 'smooth' });
+
+        let cuentaDescarga = 5;
+        const countdownBox = document.getElementById('downloadCountdownBox');
+        const timerSecSpan = document.getElementById('downloadTimerSec');
+        countdownBox.style.display = 'inline-block';
+        btnDescargar.style.display = 'none';
+
+        const timerId = setInterval(() => {
+          cuentaDescarga -= 1;
+          if (cuentaDescarga > 0) {
+            timerSecSpan.textContent = cuentaDescarga;
+          } else {
+            clearInterval(timerId);
+            countdownBox.style.display = 'none';
+            btnDescargar.style.display = 'inline-block';
+          }
+        }, 1000);
+
+      } catch (err) {
+        alert("Ocurrió un error al procesar la firma en el servidor.");
+        console.error(err);
+      }
+    }
+
+    btnDescargar.addEventListener('click', async () => {
+      if (!descargaUrlActual) return;
+      try {
+        const res = await fetch(descargaUrlActual);
+        const blob = await res.blob();
+        const urlBlob = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = urlBlob;
+        a.download = nombreArchivoFinalGlobal || "documento_firmado_celerdoc.pdf";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(urlBlob);
+      } catch (e) {
+        window.open(descargaUrlActual, '_blank');
+      }
+    });
+
+    detectarNavegador();
+  </script>
+</body>
+</html>
