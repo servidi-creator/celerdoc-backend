@@ -338,7 +338,7 @@ def cargar_configuracion_estilos():
             "zona_trazo": {"alto_contenedor": 40},
             "nombres_apellidos": {"negrita": True, "tamano_fuente": 10, "color": "#111827", "interlineado": 12},
             "identificacion": {"negrita": False, "tamano_fuente": 9, "color": "#4B5563"},
-            "codigo_verificacion": {"tamano_fuente": 4.0, "color": "#4B5563"}
+            "codigo_verificacion": {"tamano_fuente": 6.0, "color": "#4B5563"}
         }
     }
 
@@ -361,7 +361,7 @@ def generar_qr_bytes(data_texto: str) -> bytes:
 
 def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, validador_id, fecha_utc, trazo_bytes=None):
     """
-    Renderiza el bloque de firma con texto 'CelerDoc: security value code' estrictamente fijado a 4.0 pt.
+    Renderiza el bloque de firma con texto 'CelerDoc: security value code' estrictamente fijado a 6.0 pt inmodificable.
     """
     config = cargar_configuracion_estilos().get("capas", {})
     
@@ -408,10 +408,10 @@ def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, v
     y_id = y_nombre + 12
     pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_id), str(id_texto)[:35], fontsize=sz_id, color=col_id)
 
-    # 7. Capa Código de Verificación FIJADA ESTRICTAMENTE A 4.0 pt (Sin desbordamiento)
-    y_verif = y_id + 10
+    # 7. Capa Código de Verificación FIJADA ESTRICTAMENTE A 6.0 pt ESTÁNDAR INMODIFICABLE
+    y_verif = y_id + 11
     texto_verif = f"CelerDoc: security value code: {validador_id} | {fecha_utc}"
-    pagina.insert_text(fitz.Point(rect_destino.x0 + 10, y_verif), texto_verif, fontsize=4.0, color=(0.3, 0.35, 0.4))
+    pagina.insert_text(fitz.Point(rect_destino.x0 + 10, y_verif), texto_verif, fontsize=6.0, color=(0.3, 0.35, 0.4))
 
 
 def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
