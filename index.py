@@ -338,7 +338,7 @@ def cargar_configuracion_estilos():
             "zona_trazo": {"alto_contenedor": 40},
             "nombres_apellidos": {"negrita": True, "tamano_fuente": 10, "color": "#111827", "interlineado": 12},
             "identificacion": {"negrita": False, "tamano_fuente": 9, "color": "#4B5563"},
-            "codigo_verificacion": {"tamano_fuente": 6.0, "color": "#4B5563"}
+            "codigo_verificacion": {"tamano_fuente": 5.0, "color": "#4B5563"}
         }
     }
 
@@ -361,7 +361,7 @@ def generar_qr_bytes(data_texto: str) -> bytes:
 
 def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, validador_id, fecha_utc, trazo_bytes=None):
     """
-    Renderiza el bloque de firma con texto 'CelerDoc: security value code' estrictamente fijado a 6.0 pt inmodificable.
+    Renderiza el bloque de firma con texto 'CelerDoc: security value code' estrictamente fijado a 5.0 pt inmodificable.
     """
     config = cargar_configuracion_estilos().get("capas", {})
     
@@ -391,7 +391,7 @@ def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, v
         width=0.8
     )
 
-    # 4. Capa Zona de Trazo
+    # 4. Capa Zona de Trazo o Imagen
     if trazo_bytes:
         rect_trazo = fitz.Rect(rect_destino.x0 + 12, rect_destino.y0 + 4, rect_destino.x1 - 8, rect_destino.y0 + alto_trazo)
         pagina.insert_image(rect_trazo, stream=trazo_bytes)
@@ -408,10 +408,10 @@ def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, v
     y_id = y_nombre + 12
     pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_id), str(id_texto)[:35], fontsize=sz_id, color=col_id)
 
-    # 7. Capa Código de Verificación FIJADA ESTRICTAMENTE A 6.0 pt ESTÁNDAR INMODIFICABLE
+    # 7. Capa Código de Verificación FIJADA ESTRICTAMENTE A 5.0 pt ESTÁNDAR INMODIFICABLE
     y_verif = y_id + 11
     texto_verif = f"CelerDoc: security value code: {validador_id} | {fecha_utc}"
-    pagina.insert_text(fitz.Point(rect_destino.x0 + 10, y_verif), texto_verif, fontsize=6.0, color=(0.3, 0.35, 0.4))
+    pagina.insert_text(fitz.Point(rect_destino.x0 + 10, y_verif), texto_verif, fontsize=5.0, color=(0.3, 0.35, 0.4))
 
 
 def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
@@ -517,7 +517,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         rect_y0 = max(10, min(alto_pag - sello_h - 10, centro_y - (sello_h / 2)))
         rect_destino = fitz.Rect(rect_x0, rect_y0, rect_x0 + sello_w, rect_y0 + sello_h)
 
-        # 2. Decodificar trazo manuscrito y extraer hash biométrico
+        # 2. Decodificar trazo o imagen de firma y calcular hash biométrico/gráfico
         trazo_bytes = None
         sha256_trazo = "No registrado"
         if payload.trazo_firma_base64 and "," in payload.trazo_firma_base64:
@@ -594,7 +594,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             ("Aceptacion Terminos y Privacidad", f"Aceptado expresamente por el firmante ({ts_terms[:19]} UTC)"),
             ("SHA-256 Documento Original", sha256_original),
             ("SHA-256 Documento con Firma", sha256_con_firma),
-            ("Hash Biometrico del Trazo", sha256_trazo[:48] + ("..." if len(sha256_trazo) > 48 else "")),
+            ("Hash Biometrico/Grafico de Firma", sha256_trazo[:48] + ("..." if len(sha256_trazo) > 48 else "")),
             ("Contenedor Firma PKCS#7", pkcs7_serial),
             ("Sello Hash Digital PKCS #7", pkcs7_hash_real),
             ("Codigo Validador Transaccion", validador_id),

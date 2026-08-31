@@ -104,7 +104,6 @@
     .phone-prefix { background: var(--bg-subtle); padding: 0 10px; font-size: 13px; font-weight: 600; color: var(--brand-primary); border-right: 1px solid var(--border-input); height: 100%; display: flex; align-items: center; user-select: none; }
     .phone-input-wrap input { border: none; height: 100%; border-radius: 0; padding-left: 8px; }
 
-    /* CONTENEDOR DE TÉRMINOS CON RESALTO UX */
     .terms-wrap { 
       margin-bottom: 18px; 
       display: flex; 
@@ -224,7 +223,6 @@
     .canvas-page-wrapper canvas { display: block; }
     .page-label-badge { position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.75); color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; z-index: 5; pointer-events: none; }
 
-    /* ZONA DE FIRMA FLOTANTE Y DINÁMICA (TOUCH + CURSOR) */
     #floatingSignGroup {
       position: absolute;
       width: 210px;
@@ -255,8 +253,9 @@
     }
     #markerFirma:active { cursor: grabbing; }
 
+    /* TEXTO DE SEGURIDAD ESTRICTAMENTE A 5PX */
     .marker-security-text {
-      font-size: 7.5px;
+      font-size: 5px !important;
       color: #3366CC;
       font-weight: 700;
       letter-spacing: 0.2px;
@@ -321,6 +320,7 @@
       transform: translateX(-50%);
     }
 
+    /* MODAL DE FIRMA CON PESTAÑAS (TRAZO / IMAGEN) */
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
@@ -328,17 +328,95 @@
     }
     .modal-card {
       background: var(--bg-card); border: 1px solid var(--brand-primary); border-radius: 12px;
-      padding: 24px; width: 100%; max-width: 550px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      padding: 24px; width: 100%; max-width: 580px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.25);
     }
-    .modal-card h3 { margin: 0 0 8px 0; color: var(--brand-primary); font-size: 19px; font-weight: 600; }
-    .modal-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+    .modal-card h3 { margin: 0 0 6px 0; color: var(--brand-primary); font-size: 19px; font-weight: 600; }
     
+    .signature-tabs {
+      display: flex;
+      border-bottom: 2px solid var(--border-subtle);
+      margin-bottom: 16px;
+      gap: 8px;
+      justify-content: center;
+    }
+    .tab-btn {
+      padding: 8px 16px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .tab-btn.active {
+      color: var(--brand-primary);
+      border-bottom-color: var(--brand-primary);
+    }
+
     .signature-pad-container {
-      width: 100%; height: 200px; background: #ffffff; border: 2px dashed var(--border-input);
-      border-radius: 8px; position: relative; margin-bottom: 20px; cursor: crosshair; touch-action: none;
+      width: 100%; height: 210px; background: #ffffff; border: 2px dashed var(--border-input);
+      border-radius: 8px; position: relative; margin-bottom: 16px; cursor: crosshair; touch-action: none; overflow: hidden;
     }
     #canvasFullscreenPad { width: 100%; height: 100%; display: block; border-radius: 6px; }
     .pad-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; color: #94a3b8; pointer-events: none; font-weight: 400; }
+
+    /* CONTENEDOR DE IMAGEN Y REDIMENSIONAMIENTO PROPORCIONAL */
+    #imageSignContainer {
+      width: 100%;
+      height: 210px;
+      background: #f8fafc;
+      border: 2px dashed var(--border-input);
+      border-radius: 8px;
+      position: relative;
+      margin-bottom: 16px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      user-select: none;
+      touch-action: none;
+    }
+    .image-placeholder-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .btn-choose-img {
+      background: var(--brand-primary);
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #imgSignatureElement {
+      position: absolute;
+      touch-action: none;
+      display: none;
+      cursor: move;
+      border: 1px dashed #3366CC;
+    }
+    .resize-handle {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: #3366CC;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      right: -7px;
+      bottom: -7px;
+      cursor: nwse-resize;
+      display: none;
+      touch-action: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
 
     .modal-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
     .btn-secondary { background: #64748b; color: #ffffff; border: none; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
@@ -390,7 +468,7 @@
     </div>
 
     <h1 id="txtTitulo">Celerdoc — Firmar Documento</h1>
-    <p class="desc" id="txtDesc">Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo para generar el documento certificado.</p>
+    <p class="desc" id="txtDesc">Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo o cargue su imagen de firma.</p>
 
     <div class="form-grid">
       <div class="form-group">
@@ -487,7 +565,6 @@
           <div class="page-label-badge" id="badgeActive">Activa / Documento Original</div>
           <canvas id="canvasEspejo"></canvas>
           
-          <!-- MARCADOR FLOTANTE LIBRE (TOUCH + MOUSE) -->
           <div id="floatingSignGroup">
             <div id="markerFirma">
               <span class="marker-security-text">CelerDoc: security value code</span>
@@ -502,18 +579,37 @@
       </div>
     </div>
 
+    <!-- MODAL DE FIRMA MULTI-OPCIÓN (TRAZO O IMAGEN) -->
     <div class="modal-overlay" id="modalSignaturePad">
       <div class="modal-card">
-        <h3>Realice su Firma</h3>
-        <p>Dibuje su trazo con el dedo o el cursor dentro del recuadro.</p>
+        <h3>Definir Firma Electrónica</h3>
         
+        <div class="signature-tabs">
+          <button type="button" class="tab-btn active" id="tabDraw">✍️ Dibujar Trazo</button>
+          <button type="button" class="tab-btn" id="tabUploadImg">🖼️ Cargar Imagen</button>
+        </div>
+        
+        <!-- Pestaña 1: Trazo Manuscrito -->
         <div class="signature-pad-container" id="padContainer">
           <canvas id="canvasFullscreenPad"></canvas>
-          <span class="pad-placeholder" id="fullscreenPadPlaceholder">Trace aquí su firma</span>
+          <span class="pad-placeholder" id="fullscreenPadPlaceholder">Trace aquí su firma con el dedo o mouse</span>
+        </div>
+
+        <!-- Pestaña 2: Imagen con Redimensionamiento Proporcional -->
+        <div id="imageSignContainer">
+          <div class="image-placeholder-box" id="boxImgPlaceholder" onclick="document.getElementById('inputSignImgFile').click()">
+            <span>📂 Seleccione su imagen de firma (PNG, JPG, WEBP, etc.)</span>
+            <span class="btn-choose-img">Examinar archivo</span>
+          </div>
+          <input type="file" id="inputSignImgFile" accept="image/*">
+          <div id="imgWrapper" style="position: relative; display: inline-block;">
+            <img id="imgSignatureElement" alt="Firma">
+            <div class="resize-handle" id="imgResizeHandle"></div>
+          </div>
         </div>
 
         <div class="modal-buttons">
-          <button type="button" class="btn-secondary" id="btnClearFullscreenSignature">Borrar / Modificar</button>
+          <button type="button" class="btn-secondary" id="btnClearFullscreenSignature">Borrar / Cambiar</button>
           <button type="button" class="btn-secondary" id="btnCancelSignatureModal">Cancelar</button>
           <button type="button" class="btn-action-modal" id="btnConfirmSignatureModal">Firmar y Continuar</button>
         </div>
@@ -599,7 +695,7 @@
     const textosIdiomas = {
       es: {
         titulo: "Celerdoc — Firmar Documento",
-        desc: "Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo para generar el documento certificado.",
+        desc: "Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo o cargue su imagen de firma.",
         lblTipoDoc: "Tipo de Documento *",
         lblNombreTitular: "Nombre Completo *",
         lblNumDoc: "Nº de Documento *",
@@ -636,7 +732,7 @@
       },
       en: {
         titulo: "Celerdoc — Sign Document",
-        desc: "Upload original document, place signature point, fill required fields and draw your signature to generate certified document.",
+        desc: "Upload original document, place signature point, fill required fields and draw your signature or upload signature image.",
         lblTipoDoc: "Document Type *",
         lblNombreTitular: "Full Signer Name *",
         lblNumDoc: "Document Number *",
@@ -983,8 +1079,141 @@
     const btnClearFullscreenSignature = document.getElementById('btnClearFullscreenSignature');
     const btnCancelSignatureModal = document.getElementById('btnCancelSignatureModal');
     const btnConfirmSignatureModal = document.getElementById('btnConfirmSignatureModal');
+
+    // ELEMENTOS DE PESTAÑAS Y CARGA DE IMAGEN
+    const tabDraw = document.getElementById('tabDraw');
+    const tabUploadImg = document.getElementById('tabUploadImg');
+    const imageSignContainer = document.getElementById('imageSignContainer');
+    const boxImgPlaceholder = document.getElementById('boxImgPlaceholder');
+    const inputSignImgFile = document.getElementById('inputSignImgFile');
+    const imgSignatureElement = document.getElementById('imgSignatureElement');
+    const imgResizeHandle = document.getElementById('imgResizeHandle');
+
+    let modoFirmaActual = 'draw'; // 'draw' o 'image'
     let isDrawingFullscreen = false;
     let haCompletadoTrazo = false;
+    let imgOriginalWidth = 0;
+    let imgOriginalHeight = 0;
+    let imgAspectRatio = 1.0;
+    let currentImgW = 140;
+    let currentImgH = 70;
+
+    tabDraw.addEventListener('click', () => {
+      modoFirmaActual = 'draw';
+      tabDraw.classList.add('active');
+      tabUploadImg.classList.remove('active');
+      padContainer.style.display = 'block';
+      imageSignContainer.style.display = 'none';
+      ajustarTamanoCanvasFullscreen();
+    });
+
+    tabUploadImg.addEventListener('click', () => {
+      modoFirmaActual = 'image';
+      tabUploadImg.classList.add('active');
+      tabDraw.classList.remove('active');
+      padContainer.style.display = 'none';
+      imageSignContainer.style.display = 'flex';
+    });
+
+    inputSignImgFile.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const img = new Image();
+          img.onload = () => {
+            imgOriginalWidth = img.width;
+            imgOriginalHeight = img.height;
+            imgAspectRatio = img.width / img.height;
+
+            const maxW = 180;
+            const maxH = 90;
+            if (imgAspectRatio >= 1) {
+              currentImgW = maxW;
+              currentImgH = maxW / imgAspectRatio;
+              if (currentImgH > maxH) {
+                currentImgH = maxH;
+                currentImgW = maxH * imgAspectRatio;
+              }
+            } else {
+              currentImgH = maxH;
+              currentImgW = maxH * imgAspectRatio;
+            }
+
+            imgSignatureElement.src = evt.target.result;
+            imgSignatureElement.style.width = `${currentImgW}px`;
+            imgSignatureElement.style.height = `${currentImgH}px`;
+            imgSignatureElement.style.display = 'block';
+            imgResizeHandle.style.display = 'block';
+            boxImgPlaceholder.style.display = 'none';
+            haCompletadoTrazo = true;
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // REDIMENSIONAMIENTO PROPORCIONAL DE IMAGEN
+    let isResizingImg = false;
+    let startResizeX = 0;
+    let startResizeW = 0;
+
+    imgResizeHandle.addEventListener('mousedown', (e) => {
+      isResizingImg = true;
+      startResizeX = e.clientX;
+      startResizeW = currentImgW;
+      e.stopPropagation();
+      e.preventDefault();
+    });
+
+    imgResizeHandle.addEventListener('touchstart', (e) => {
+      isResizingImg = true;
+      startResizeX = e.touches[0].clientX;
+      startResizeW = currentImgW;
+      e.stopPropagation();
+    }, { passive: false });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isResizingImg) return;
+      const deltaX = e.clientX - startResizeX;
+      let newW = Math.max(50, Math.min(260, startResizeW + deltaX));
+      let newH = newW / imgAspectRatio;
+      currentImgW = newW;
+      currentImgH = newH;
+      imgSignatureElement.style.width = `${currentImgW}px`;
+      imgSignatureElement.style.height = `${currentImgH}px`;
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isResizingImg) return;
+      const deltaX = e.touches[0].clientX - startResizeX;
+      let newW = Math.max(50, Math.min(260, startResizeW + deltaX));
+      let newH = newW / imgAspectRatio;
+      currentImgW = newW;
+      currentImgH = newH;
+      imgSignatureElement.style.width = `${currentImgW}px`;
+      imgSignatureElement.style.height = `${currentImgH}px`;
+    }, { passive: false });
+
+    window.addEventListener('mouseup', () => { isResizingImg = false; });
+    window.addEventListener('touchend', () => { isResizingImg = false; });
+
+    function renderizarImagenEnCanvasFinal() {
+      const c = document.createElement('canvas');
+      c.width = 400;
+      c.height = 160;
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      const drawW = Math.min(c.width * 0.9, currentImgW * 1.5);
+      const drawH = drawW / imgAspectRatio;
+      const drawX = (c.width - drawW) / 2;
+      const drawY = (c.height - drawH) / 2;
+
+      ctx.drawImage(imgSignatureElement, drawX, drawY, drawW, drawH);
+      return c.toDataURL('image/png');
+    }
 
     const modalOtp = document.getElementById('modalOtp');
     const inputOtp = document.getElementById('inputOtp');
@@ -1007,12 +1236,14 @@
 
     function ajustarTamanoCanvasFullscreen() {
       const rect = padContainer.getBoundingClientRect();
-      canvasFullscreenPad.width = rect.width;
-      canvasFullscreenPad.height = rect.height;
-      ctxFullscreenPad.lineWidth = 2.5;
-      ctxFullscreenPad.lineCap = 'round';
-      ctxFullscreenPad.lineJoin = 'round';
-      ctxFullscreenPad.strokeStyle = '#0f172a';
+      if (rect.width > 0 && rect.height > 0) {
+        canvasFullscreenPad.width = rect.width;
+        canvasFullscreenPad.height = rect.height;
+        ctxFullscreenPad.lineWidth = 2.5;
+        ctxFullscreenPad.lineCap = 'round';
+        ctxFullscreenPad.lineJoin = 'round';
+        ctxFullscreenPad.strokeStyle = '#0f172a';
+      }
     }
 
     function empezarDibujoFullscreen(e) {
@@ -1058,10 +1289,20 @@
 
     btnClearFullscreenSignature.addEventListener('click', (e) => {
       e.stopPropagation();
-      ctxFullscreenPad.clearRect(0, 0, canvasFullscreenPad.width, canvasFullscreenPad.height);
-      fullscreenPadPlaceholder.style.display = 'block';
-      haCompletadoTrazo = false;
-      datosTrazabilidad.trazo_firma_png = '';
+      if (modoFirmaActual === 'draw') {
+        ctxFullscreenPad.clearRect(0, 0, canvasFullscreenPad.width, canvasFullscreenPad.height);
+        fullscreenPadPlaceholder.style.display = 'block';
+        haCompletadoTrazo = false;
+        datosTrazabilidad.trazo_firma_png = '';
+      } else {
+        imgSignatureElement.src = '';
+        imgSignatureElement.style.display = 'none';
+        imgResizeHandle.style.display = 'none';
+        boxImgPlaceholder.style.display = 'flex';
+        inputSignImgFile.value = '';
+        haCompletadoTrazo = false;
+        datosTrazabilidad.trazo_firma_png = '';
+      }
     });
 
     btnCancelSignatureModal.addEventListener('click', (e) => {
@@ -1072,9 +1313,15 @@
     btnConfirmSignatureModal.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!haCompletadoTrazo) {
-        alert("Por favor realice su trazo de firma antes de continuar.");
+        alert(modoFirmaActual === 'draw' ? "Por favor realice su trazo de firma." : "Por favor cargue una imagen de firma.");
         return;
       }
+
+      if (modoFirmaActual === 'image') {
+        datosTrazabilidad.trazo_firma_png = renderizarImagenEnCanvasFinal();
+        timestampTrazoFirmaUtc = new Date().toISOString();
+      }
+
       modalSignaturePad.style.display = 'none';
       
       const tel = inputPhone.value.trim();
@@ -1336,8 +1583,8 @@
         } else {
           const pageRef = await pdfActual.getPage(pdfActual.numPages);
           const vpRef = pageRef.getViewport({ scale: escalaActual });
-          canvasPrev.width = vpPrev.width;
-          canvasPrev.height = vpPrev.height;
+          canvasPrev.width = vpRef.width;
+          canvasPrev.height = vpRef.height;
           ctxPrev.fillStyle = (temaActual === 'dark') ? '#1e293b' : '#ffffff';
           ctxPrev.fillRect(0, 0, canvasPrev.width, canvasPrev.height);
         }
@@ -1367,7 +1614,6 @@
       renderizarEstampaPKCS7();
     }
 
-    // MANIPULACIÓN FLOTANTE TOUCH (DEDO) Y CURSOR (MOUSE)
     let isDraggingMarker = false;
 
     markerFirma.addEventListener('mousedown', (e) => {
@@ -1500,7 +1746,9 @@
 
       modalSignaturePad.style.display = 'flex';
       setTimeout(() => {
-        ajustarTamanoCanvasFullscreen();
+        if (modoFirmaActual === 'draw') {
+          ajustarTamanoCanvasFullscreen();
+        }
       }, 50);
     });
 

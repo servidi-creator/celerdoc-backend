@@ -1,6 +1,15 @@
 {
   "estilo_bloque_principal": {
-    "descripcion": "Estilo corporativo estándar de Celerdoc con franja azul tecnológica",
+    "dimensiones": {
+      "ancho": 200,
+      "alto": 80
+    },
+    "colores": {
+      "fondo": "#FAFCFF",
+      "borde": "#D1D5DB",
+      "linea_lateral": "#3366CC",
+      "separador": "#3366CC"
+    },
     "capas": {
       "zona_trazo": {
         "alto_contenedor": 40
@@ -17,32 +26,8 @@
         "color": "#4B5563"
       },
       "codigo_verificacion": {
-        "negrita": false,
-        "tamano_fuente": 4.8,
+        "tamano_fuente": 5.0,
         "color": "#4B5563"
-      }
-    }
-  },
-  "estilo_minimalista": {
-    "descripcion": "Plantilla futura para firmas compactas de una sola línea",
-    "capas": {
-      "zona_trazo": {
-        "alto_contenedor": 30
-      },
-      "nombres_apellidos": {
-        "negrita": false,
-        "tamano_fuente": 8.5,
-        "color": "#1f2937"
-      },
-      "identificacion": {
-        "negrita": false,
-        "tamano_fuente": 7.5,
-        "color": "#4b5563"
-      },
-      "codigo_verificacion": {
-        "negrita": false,
-        "tamano_fuente": 4.5,
-        "color": "#6b7280"
       }
     }
   }
