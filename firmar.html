@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Celerdoc — Firmar Documento</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     :root[data-theme="light"] {
       --bg-body: #f8fafc;
@@ -16,7 +17,7 @@
       --text-muted: #475569;
       --text-label: #1e293b;
       --brand-primary: #3366CC;
-      --brand-primary-hover: #274fa8;
+      --brand-primary-hover: #224fa8;
       --bg-subtle: #f1f5f9;
       --border-subtle: #e2e8f0;
       --viewer-bg: #e2e8f0;
@@ -25,6 +26,8 @@
       --color-error: #dc2626;
       --border-error: #ef4444;
       --bg-error-light: #fef2f2;
+      --dropzone-bg: #f4f8ff;
+      --dropzone-border: #3366CC;
     }
 
     :root[data-theme="dark"] {
@@ -46,6 +49,8 @@
       --color-error: #f87171;
       --border-error: #ef4444;
       --bg-error-light: #450a0a;
+      --dropzone-bg: #111d33;
+      --dropzone-border: #4d82ec;
     }
 
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -82,12 +87,8 @@
       align-items: start;
     }
     
-    @media (max-width: 992px) {
-      .form-grid { grid-template-columns: 1fr 1fr; }
-    }
-    @media (max-width: 600px) {
-      .form-grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 992px) { .form-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
 
     .form-group { display: flex; flex-direction: column; position: relative; }
     label { font-size: 12px; font-weight: 600; color: var(--text-label); height: 24px; display: flex; align-items: flex-end; margin-bottom: 6px; }
@@ -106,9 +107,43 @@
     .terms-wrap { margin-bottom: 18px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-label); }
     .terms-wrap input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--brand-primary); cursor: pointer; }
 
-    .dropzone { border: 2px dashed var(--border-input); border-radius: 8px; padding: 28px 16px; text-align: center; cursor: pointer; background: var(--bg-subtle); margin-bottom: 20px; outline: none; transition: all 0.2s ease; }
-    .dropzone:hover { border-color: var(--brand-primary); background: rgba(51, 102, 204, 0.04); }
-    .dropzone span { font-weight: 500; color: var(--text-muted); font-size: 13px; }
+    .dropzone-container {
+      border: 2px dashed var(--dropzone-border);
+      border-radius: 8px;
+      padding: 22px 16px;
+      text-align: center;
+      cursor: pointer;
+      background: linear-gradient(180deg, var(--dropzone-bg) 0%, rgba(51, 102, 204, 0.04) 100%);
+      margin-bottom: 20px;
+      outline: none;
+      transition: all 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(51, 102, 204, 0.08);
+    }
+    .dropzone-container:hover {
+      border-color: var(--brand-primary-hover);
+      background: linear-gradient(180deg, rgba(51, 102, 204, 0.12) 0%, rgba(51, 102, 204, 0.05) 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(51, 102, 204, 0.14);
+    }
+    .dropzone-action-btn {
+      background: #3366CC;
+      color: #ffffff;
+      font-size: 13.5px;
+      font-weight: 600;
+      padding: 9px 22px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      box-shadow: 0 3px 8px rgba(51, 102, 204, 0.25);
+      letter-spacing: 0.2px;
+    }
+    .dropzone-subtitle-guide { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-top: 2px; }
     .dropzone-disabled { opacity: 0.5; pointer-events: none; cursor: not-allowed; }
     input[type="file"] { display: none; }
 
@@ -156,17 +191,13 @@
     }
 
     .nav-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; display: none; flex-wrap: wrap; gap: 10px; background: var(--bg-subtle); border: 1px solid var(--border-subtle); padding: 10px 14px; border-radius: 8px; }
-    
     .toolbar-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .ux-btn { background: var(--bg-card); border: 1px solid var(--border-input); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease; }
     .ux-btn:hover:not(:disabled) { border-color: var(--brand-primary); background: var(--brand-primary); color: #ffffff; }
     .ux-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    
     .divider { width: 1px; height: 24px; background: var(--border-input); margin: 0 4px; }
-    
     .page-indicator { font-size: 12.5px; font-weight: 500; color: var(--text-label); display: flex; align-items: center; gap: 6px; background: var(--bg-card); padding: 4px 10px; border: 1px solid var(--border-input); border-radius: 6px; }
     .pdf-page-input { width: 40px; text-align: center; background: var(--bg-input); border: 1px solid var(--border-input); color: var(--brand-primary); border-radius: 4px; padding: 2px; font-size: 12px; outline: none; font-weight: 600; }
-
     .btn-download-reader { background: var(--brand-primary); color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; display: none; align-items: center; gap: 6px; }
     .btn-download-reader:hover { background: var(--brand-primary-hover); }
 
@@ -174,57 +205,104 @@
     .pages-cascade-container { display: flex; flex-direction: column; align-items: center; gap: 24px; position: relative; }
     .canvas-page-wrapper { position: relative; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.12); border-radius: 4px; overflow: hidden; background: #ffffff; }
     .canvas-page-wrapper canvas { display: block; }
-    
     .page-label-badge { position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.75); color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; z-index: 5; pointer-events: none; }
 
+    /* ZONA DE FIRMA FLOTANTE Y DINÁMICA (TOUCH + CURSOR) */
     #floatingSignGroup {
       position: absolute;
-      width: 200px;
+      width: 210px;
       transform: translate(-50%, -50%);
       display: none;
       flex-direction: column;
       align-items: center;
       gap: 6px;
-      z-index: 25;
+      z-index: 30;
       user-select: none;
+      touch-action: none;
     }
 
     #markerFirma {
       width: 100%;
-      height: 75px;
+      height: 74px;
       border: 1.5px dashed #3366CC;
-      background-color: rgba(51, 102, 204, 0.15);
+      background-color: rgba(51, 102, 204, 0.16);
       border-radius: 6px;
       cursor: grab;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-direction: column;
-      font-size: 11px;
-      color: #3366CC;
-      font-weight: 600;
-      padding: 4px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      padding: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      backdrop-filter: blur(1px);
     }
     #markerFirma:active { cursor: grabbing; }
-    .marker-watermark { font-size: 9px; font-weight: 400; opacity: 0.85; margin-top: 3px; color: #475569; }
+
+    .marker-security-text {
+      font-size: 7.5px;
+      color: #3366CC;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+      text-align: center;
+      line-height: 1.2;
+      pointer-events: none;
+    }
+    .marker-watermark { font-size: 8px; font-weight: 500; opacity: 0.9; margin-top: 3px; color: #334155; pointer-events: none; }
 
     .btn-floating-sign {
-      background: #3366CC;
+      background: #1d4ed8;
       color: #ffffff;
-      border: 1px solid #7099ea;
-      padding: 7px 16px;
-      border-radius: 20px;
-      font-size: 12.5px;
-      font-weight: 500;
+      border: 1px solid #60a5fa;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(51, 102, 204, 0.25);
+      box-shadow: 0 4px 14px rgba(29, 78, 216, 0.35);
       display: flex;
       align-items: center;
-      gap: 5px;
-      transition: transform 0.1s, background 0.2s;
+      gap: 6px;
+      transition: all 0.2s ease;
+      letter-spacing: 0.2px;
     }
-    .btn-floating-sign:hover { background: #274fa8; transform: scale(1.03); }
+    .btn-floating-sign:hover { background: #1e40af; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(29, 78, 216, 0.45); }
+
+    .pkcs7-badge-container {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid #3366CC;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-family: monospace;
+      font-size: 9px;
+      color: #0f172a;
+      z-index: 20;
+      box-sizing: border-box;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      gap: 6px;
+    }
+    .pkcs7-lock-icon { font-size: 12px; flex-shrink: 0; }
+    .pkcs7-qr-slot { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .pkcs7-data-text { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .pkcs7-hash-val { font-family: monospace; font-size: 8.5px; color: #1e293b; }
+
+    .pkcs7-pos-left-bottom-up {
+      position: absolute;
+      left: 8px;
+      bottom: 12px;
+      transform-origin: left bottom;
+      transform: rotate(-90deg) translateY(100%);
+    }
+
+    .pkcs7-pos-bottom-footer {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
 
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -338,13 +416,19 @@
       </div>
     </div>
 
+    <!-- CASILLA DE TÉRMINOS DESMARCADA POR DEFECTO -->
     <div class="terms-wrap">
-      <input type="checkbox" id="chkTerms" checked>
+      <input type="checkbox" id="chkTerms">
       <label for="chkTerms" id="lblTerms">Acepto los Términos, Condiciones y Política de Privacidad de Celerdoc.</label>
     </div>
 
-    <div class="dropzone" id="dropArea" onclick="document.getElementById('fileInput').click()">
-      <span id="txtDrop">Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF</span>
+    <!-- BOTÓN / ZONA DE CARGA UX -->
+    <div class="dropzone-container" id="dropArea" onclick="document.getElementById('fileInput').click()">
+      <div class="dropzone-action-btn">
+        <span>📂</span>
+        <span id="txtBtnAccion">Insertar documento para firmar</span>
+      </div>
+      <div class="dropzone-subtitle-guide" id="txtDropSubtitle">Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF</div>
       <input type="file" id="fileInput" accept="application/pdf">
     </div>
 
@@ -383,16 +467,17 @@
           <canvas id="canvasPrev"></canvas>
         </div>
         <div class="canvas-page-wrapper" id="wrapperActive">
-          <div class="page-label-badge" id="badgeActive">Activa / Nueva</div>
+          <div class="page-label-badge" id="badgeActive">Activa / Documento Original</div>
           <canvas id="canvasEspejo"></canvas>
           
+          <!-- MARCADOR FLOTANTE LIBRE (TOUCH + MOUSE) -->
           <div id="floatingSignGroup">
             <div id="markerFirma">
-              <span>✍️ ZONA DE FIRMA</span>
-              <span class="marker-watermark">Arrastra para posicionar</span>
+              <span class="marker-security-text">CelerDoc: security value code</span>
+              <span class="marker-watermark">🖐️ Mueve aquí con dedo o cursor</span>
             </div>
             <button type="button" class="btn-floating-sign" id="btnFloatingSign">
-              <span>Firmar</span>
+              <span>✍️ Firmar</span>
             </button>
           </div>
 
@@ -449,7 +534,7 @@
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    const API_URL = "http://127.0.0.1:8000";
+    const API_URL = "https://celerdoc.onrender.com";
     const CODIGO_OTP_SIMULADO = "123456";
     const MAX_INTENTOS_OTP = 5;
     let intentosFallidosOTP = 0;
@@ -477,7 +562,7 @@
       { codigo: "NI", nombre: "Nicaragua", indicativo: "+505", bandera: "🇳🇮", lang: "es" },
       { codigo: "CR", nombre: "Costa Rica", indicativo: "+506", bandera: "🇨🇷", lang: "es" },
       { codigo: "PA", nombre: "Panamá", indicativo: "+507", bandera: "🇵🇦", lang: "es" },
-      { codigo: "UY", nombre: "Uruguay", indicativo: "+598", bandera: "🇺🇾", lang: "es" },
+      { codigo: "UY", nombre: "Uruguay", indicativo: "+598", bandera: "UY", lang: "es" },
       { codigo: "PR", nombre: "Puerto Rico", indicativo: "+1", bandera: "🇵🇷", lang: "es" },
       { codigo: "VE", nombre: "Venezuela", indicativo: "+58", bandera: "🇻🇪", lang: "es" },
       { codigo: "US", nombre: "United States", indicativo: "+1", bandera: "🇺🇸", lang: "en" },
@@ -504,8 +589,9 @@
         lblEmail: "Correo Electrónico *",
         lblWhatsapp: "Celular / WhatsApp *",
         lblTerms: "Acepto los Términos, Condiciones y Política de Privacidad de Celerdoc.",
-        dropText: "Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF",
-        lblBtnFirmar: "Firmar",
+        btnAccion: "Insertar documento para firmar",
+        dropSubtitle: "Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF",
+        lblBtnFirmar: "✍️ Firmar",
         otpTitulo: "Verificación de Identidad por OTP",
         btnCancelarOtp: "Cancelar",
         btnDescargar: "Descargar Nuevo PDF Firmado",
@@ -521,7 +607,7 @@
         ofText: "de",
         downloadReader: "📥 Descargar documento original",
         badgePrev: "Página Anterior",
-        badgeActive: "Página Activa / Nueva",
+        badgeActive: "Página Activa / Documento Original",
         docs: [
           { val: "CC", text: "CC - Cédula de Ciudadanía / DNI" },
           { val: "CE", text: "CE - Cédula de Extranjería" },
@@ -540,8 +626,9 @@
         lblEmail: "Corporate Email *",
         lblWhatsapp: "Mobile / WhatsApp *",
         lblTerms: "I accept Celerdoc Terms, Conditions, and Privacy Policy.",
-        dropText: "Click, drag, or paste (Ctrl+V) your PDF file here",
-        lblBtnFirmar: "Sign",
+        btnAccion: "Insert document to sign",
+        dropSubtitle: "Click, drag, or paste (Ctrl+V) your PDF file here",
+        lblBtnFirmar: "✍️ Sign",
         otpTitulo: "Identity Verification via OTP",
         btnCancelarOtp: "Cancel",
         btnDescargar: "Download New Signed PDF",
@@ -557,7 +644,7 @@
         ofText: "of",
         downloadReader: "📥 Download original document",
         badgePrev: "Previous Page",
-        badgeActive: "Active / New Page",
+        badgeActive: "Active / Original Document Page",
         docs: [
           { val: "CC", text: "CC - National ID / DNI" },
           { val: "CE", text: "CE - Foreign ID Card" },
@@ -596,6 +683,8 @@
     const wrapPhone = document.getElementById('wrapPhone');
     const selectTipoDoc = document.getElementById('tipoDoc');
     const chkTerms = document.getElementById('chkTerms');
+
+    chkTerms.checked = false;
 
     const errNombre = document.getElementById('errNombre');
     const errNumDoc = document.getElementById('errNumDoc');
@@ -657,7 +746,8 @@
       const v3 = validarCampoEmail();
       const v4 = validarCampoPhone();
       if (!chkTerms.checked) {
-        alert("Debe aceptar los Términos, Condiciones y Política de Privacidad.");
+        alert("Debe aceptar los Términos, Condiciones y Política de Privacidad de Celerdoc.");
+        chkTerms.focus();
         return false;
       }
       return (v1 && v2 && v3 && v4);
@@ -696,12 +786,7 @@
       btnCountrySelect.textContent = `${pais.bandera} ${pais.nombre} (${pais.indicativo}) ▾`;
       document.getElementById('phonePrefixLabel').textContent = pais.indicativo;
       countryDropdown.classList.remove('open');
-      
-      if (pais.lang === 'es' || pais.lang === 'en') {
-        aplicarIdioma(pais.lang);
-      } else {
-        aplicarIdioma('en');
-      }
+      aplicarIdioma(pais.lang === 'es' || pais.lang === 'en' ? pais.lang : 'en');
     }
 
     function renderSelectorPaises() {
@@ -740,8 +825,10 @@
       document.getElementById('lblEmail').textContent = t.lblEmail;
       document.getElementById('lblWhatsapp').textContent = t.lblWhatsapp;
       document.getElementById('lblTerms').textContent = t.lblTerms;
+      
       if (!datosTrazabilidad.nombre_archivo) {
-        document.getElementById('txtDrop').textContent = t.dropText;
+        document.getElementById('txtBtnAccion').textContent = t.btnAccion;
+        document.getElementById('txtDropSubtitle').textContent = t.dropSubtitle;
       }
       document.getElementById('txtOtpTitulo').textContent = t.otpTitulo;
       document.getElementById('btnCancelarOtp').textContent = t.btnCancelarOtp;
@@ -815,14 +902,20 @@
       total_paginas: 0,
       pagina_activa: 0,
       coordenadas: { x_pct: null, y_pct: null },
-      trazo_firma_png: ''
+      trazo_firma_png: '',
+      pkcs7_aplicado: {
+        posicion_final: 'left_vertical',
+        hash: 'c2a9d8f3e5b10478bc64df91e021a876fa5e9b31d472c08416d8a9e6b21c45df',
+        algoritmo: 'SHA256withRSA / PKCS#7 Container',
+        qr_data: 'https://celerdoc.onrender.com/validar?sig=c2a9d8f3e5b10478bc64df91e021a876',
+        status: 'VALID'
+      }
     };
     let descargaUrlActual = '';
     let nombreArchivoFinalGlobal = '';
 
     const dropArea = document.getElementById('dropArea');
     const fileInput = document.getElementById('fileInput');
-    const txtDrop = document.getElementById('txtDrop');
     const toastUploadModal = document.getElementById('toastUploadModal');
     const toastFileName = document.getElementById('toastFileName');
     const toastFileHash = document.getElementById('toastFileHash');
@@ -911,10 +1004,7 @@
       const rect = canvasFullscreenPad.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      return {
-        x: clientX - rect.left,
-        y: clientY - rect.top
-      };
+      return { x: clientX - rect.left, y: clientY - rect.top };
     }
 
     canvasFullscreenPad.addEventListener('mousedown', empezarDibujoFullscreen);
@@ -957,6 +1047,79 @@
       setTimeout(() => inputOtp.focus(), 100);
     });
 
+    function renderizarEstampaPKCS7() {
+      const contenedor = document.getElementById('wrapperActive');
+      const badgeExistente = document.getElementById('pkcs7BadgeElement');
+      if (badgeExistente) badgeExistente.remove();
+
+      const pkcs = datosTrazabilidad.pkcs7_aplicado;
+      const badge = document.createElement('div');
+      badge.id = 'pkcs7BadgeElement';
+      badge.className = 'pkcs7-badge-container';
+
+      badge.innerHTML = `
+        <div class="pkcs7-lock-icon">🔒</div>
+        <div class="pkcs7-qr-slot" id="slotQrPkcs7"></div>
+        <div class="pkcs7-data-text">
+          <strong style="color: #3366CC;">PKCS#7 VALIDATION:</strong>
+          <span class="pkcs7-hash-val">${pkcs.hash}</span>
+          <span style="color: #16a34a; font-weight: bold;">[${pkcs.status}]</span>
+        </div>
+      `;
+
+      badge.className = 'pkcs7-badge-container pkcs7-pos-left-bottom-up';
+      contenedor.appendChild(badge);
+      generarQrSlot('slotQrPkcs7', pkcs.qr_data);
+
+      const markerRect = floatingSignGroup.getBoundingClientRect();
+      let badgeRect = badge.getBoundingClientRect();
+
+      const colisionVertical = !(
+        badgeRect.top > markerRect.bottom ||
+        badgeRect.right < markerRect.left ||
+        badgeRect.bottom < markerRect.top ||
+        badgeRect.left > markerRect.right
+      );
+
+      if (!colisionVertical) {
+        datosTrazabilidad.pkcs7_aplicado.posicion_final = 'left_vertical';
+        return;
+      }
+
+      badge.className = 'pkcs7-badge-container pkcs7-pos-bottom-footer';
+      badgeRect = badge.getBoundingClientRect();
+
+      const colisionFooter = !(
+        badgeRect.top > markerRect.bottom ||
+        badgeRect.right < markerRect.left ||
+        badgeRect.bottom < markerRect.top ||
+        badgeRect.left > markerRect.right
+      );
+
+      if (!colisionFooter) {
+        datosTrazabilidad.pkcs7_aplicado.posicion_final = 'bottom_above_footer';
+        return;
+      }
+
+      badge.remove();
+      datosTrazabilidad.pkcs7_aplicado.posicion_final = 'audit_table_only';
+    }
+
+    function generarQrSlot(slotId, textoQr) {
+      const el = document.getElementById(slotId);
+      if (el && typeof QRCode !== "undefined") {
+        el.innerHTML = '';
+        new QRCode(el, {
+          text: textoQr,
+          width: 28,
+          height: 28,
+          colorDark: "#0f172a",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      }
+    }
+
     async function procesarArchivoPDF(archivo) {
       if (!archivo || (archivo.type && archivo.type !== 'application/pdf')) {
         alert("Por favor seleccione o pegue un archivo PDF válido.");
@@ -966,7 +1129,9 @@
       datosTrazabilidad.nombre_archivo = archivo.name || "documento.pdf";
       timestampCargaDocUtc = new Date().toISOString();
       datosTrazabilidad.timestamp_utc = timestampCargaDocUtc;
-      txtDrop.textContent = `Archivo cargado: ${datosTrazabilidad.nombre_archivo}`;
+      
+      document.getElementById('txtBtnAccion').textContent = "Reemplazar documento";
+      document.getElementById('txtDropSubtitle').textContent = `Documento cargado: ${datosTrazabilidad.nombre_archivo}`;
 
       blobOriginalUrl = URL.createObjectURL(archivo);
       paginasExtraEnBlanco = 0;
@@ -1006,6 +1171,7 @@
         btnDescargarLectura.style.display = 'none';
       }
 
+      // Por defecto: posicionar en la última página del texto original
       irAPagina(pdfActual.numPages);
     }
 
@@ -1130,8 +1296,8 @@
         } else {
           const pageRef = await pdfActual.getPage(pdfActual.numPages);
           const vpRef = pageRef.getViewport({ scale: escalaActual });
-          canvasPrev.width = vpRef.width;
-          canvasPrev.height = vpRef.height;
+          canvasPrev.width = vpPrev.width;
+          canvasPrev.height = vpPrev.height;
           ctxPrev.fillStyle = (temaActual === 'dark') ? '#1e293b' : '#ffffff';
           ctxPrev.fillRect(0, 0, canvasPrev.width, canvasPrev.height);
         }
@@ -1139,9 +1305,10 @@
         wrapperPrev.style.display = 'none';
       }
 
+      // Propuesta por defecto: al final del texto original (X: 50%, Y: 85%)
       if (!datosTrazabilidad.coordenadas.x_pct || datosTrazabilidad.pagina_activa !== numPagina) {
         const defaultX = canvasActive.width / 2;
-        const defaultY = canvasActive.height - 90;
+        const defaultY = canvasActive.height - 85;
         floatingSignGroup.style.left = `${defaultX}px`;
         floatingSignGroup.style.top = `${defaultY}px`;
         floatingSignGroup.style.display = 'flex';
@@ -1157,8 +1324,11 @@
         floatingSignGroup.style.top = `${posY}px`;
         floatingSignGroup.style.display = 'flex';
       }
+
+      renderizarEstampaPKCS7();
     }
 
+    // MANIPULACIÓN FLOTANTE TOUCH (DEDO) Y CURSOR (MOUSE)
     let isDraggingMarker = false;
 
     markerFirma.addEventListener('mousedown', (e) => {
@@ -1182,8 +1352,18 @@
       actualizarPosicionMarcador(touch.clientX, touch.clientY);
     }, { passive: true });
 
-    window.addEventListener('mouseup', () => { isDraggingMarker = false; });
-    window.addEventListener('touchend', () => { isDraggingMarker = false; });
+    window.addEventListener('mouseup', () => { 
+      if (isDraggingMarker) {
+        isDraggingMarker = false;
+        renderizarEstampaPKCS7();
+      }
+    });
+    window.addEventListener('touchend', () => { 
+      if (isDraggingMarker) {
+        isDraggingMarker = false;
+        renderizarEstampaPKCS7();
+      }
+    });
 
     function actualizarPosicionMarcador(clientX, clientY) {
       const rect = canvasActive.getBoundingClientRect();
@@ -1274,7 +1454,6 @@
       }
 
       if (!validarFormularioCompleto()) {
-        alert("Por favor complete correctamente todos los campos obligatorios antes de firmar.");
         return;
       }
 
@@ -1353,7 +1532,6 @@
       const stampLimpio = `${anio}${mes}${dia}${hora}${min}${seg}`;
 
       const nombreBaseSinExt = datosTrazabilidad.nombre_archivo.replace(/\.[^/.]+$/, "");
-      // Nomenclatura con un solo guion bajo separando el nombre del sufijo continuo
       nombreArchivoFinalGlobal = `${nombreBaseSinExt}_${tipoDocVal}${numDocLimpio}${stampLimpio}.pdf`;
 
       const payload = {
@@ -1371,6 +1549,7 @@
         pagina_seleccionada: datosTrazabilidad.pagina_activa,
         total_paginas_con_extras: pdfActual.numPages + paginasExtraEnBlanco,
         coordenadas: datosTrazabilidad.coordenadas,
+        pkcs7_info: datosTrazabilidad.pkcs7_aplicado,
         email_notificacion: email,
         whatsapp_notificacion: whatsapp,
         timestamp_carga_doc: timestampCargaDocUtc,

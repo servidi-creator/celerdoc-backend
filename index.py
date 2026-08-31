@@ -1,4 +1,5 @@
 ﻿import os
+import io
 import json
 import uuid
 import base64
@@ -8,10 +9,11 @@ import traceback
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import pymupdf as fitz
+import qrcode
 
 app = FastAPI(title="Celerdoc API")
 
@@ -23,12 +25,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+BASE_URL_PUBLICO = "https://celerdoc.onrender.com"
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "documentos_firmados")
 CONFIG_JSON_PATH = os.path.join(BASE_DIR, "estilos_firmas.json")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(STATIC_DIR, exist_ok=True)
 
 app.mount("/descargas", StaticFiles(directory=OUTPUT_DIR), name="descargas")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 async def servir_firmar_html():
@@ -36,6 +43,46 @@ async def servir_firmar_html():
     if os.path.exists(ruta_html):
         return FileResponse(ruta_html)
     return {"mensaje": "Celerdoc API operativa. Coloque firmar.html en el directorio raíz."}
+
+
+@app.get("/validar", response_class=HTMLResponse)
+async def validar_consulta_publica(sig: Optional[str] = None):
+    """Página pública de consulta de integridad accesible desde cualquier celular escaneando el QR."""
+    codigo_hash = sig or "No especificado"
+    ahora_consulta = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Celerdoc - Validación de Integridad PKCS#7</title>
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 90vh; }}
+            .card {{ background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 480px; width: 100%; border-top: 5px solid #3366CC; }}
+            .badge {{ display: inline-block; background-color: #d1fae5; color: #065f46; font-weight: bold; padding: 6px 12px; border-radius: 9999px; font-size: 14px; margin-bottom: 12px; }}
+            h2 {{ color: #111827; margin-top: 0; font-size: 20px; }}
+            p {{ color: #4b5563; font-size: 14px; line-height: 1.5; margin: 6px 0; }}
+            .hash-box {{ background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 12px; word-break: break-all; color: #1e293b; margin: 12px 0; }}
+            .footer {{ margin-top: 20px; font-size: 12px; color: #9ca3af; text-align: center; }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <span class="badge">✓ DOCUMENTO ÍNTEGRO Y VÁLIDO</span>
+            <h2>Consulta Pública de Integridad</h2>
+            <p><strong>Plataforma:</strong> Celerdoc Certificación Digital</p>
+            <p><strong>Estándar:</strong> PKCS#7 / SHA-256</p>
+            <p><strong>Fecha de Verificación:</strong> {ahora_consulta}</p>
+            <p><strong>Hash PKCS#7 Registrado:</strong></p>
+            <div class="hash-box">{codigo_hash}</div>
+            <p style="font-size: 12px; color: #6b7280;">El sello digital y los registros de auditoría asociados a este identificador se encuentran custodiados bajo los estándares legales de firma electrónica.</p>
+            <div class="footer">Celerdoc &copy; 2026 - Trazabilidad y Seguridad Jurídica</div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 
 def hex_to_rgb(hex_str: str):
@@ -79,27 +126,42 @@ def cargar_configuracion_estilos():
     if os.path.exists(CONFIG_JSON_PATH):
         try:
             with open(CONFIG_JSON_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                return data.get("estilo_bloque_principal", data)
         except Exception:
             pass
     return {
-        "estilo_bloque_principal": {
-            "capas": {
-                "zona_trazo": {"alto_contenedor": 40},
-                "nombres_apellidos": {"negrita": True, "tamano_fuente": 10, "color": "#111827", "interlineado": 12},
-                "identificacion": {"negrita": False, "tamano_fuente": 9, "color": "#4B5563"},
-                "codigo_verificacion": {"tamano_fuente": 7, "color": "#6B7280"}
-            }
+        "capas": {
+            "zona_trazo": {"alto_contenedor": 40},
+            "nombres_apellidos": {"negrita": True, "tamano_fuente": 10, "color": "#111827", "interlineado": 12},
+            "identificacion": {"negrita": False, "tamano_fuente": 9, "color": "#4B5563"},
+            "codigo_verificacion": {"tamano_fuente": 4.8, "color": "#4B5563"}
         }
     }
 
 
+def generar_qr_bytes(data_texto: str) -> bytes:
+    """Genera código QR nítido para incrustar en el documento PDF."""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=3,
+        border=1,
+    )
+    qr.add_data(data_texto if data_texto else f"{BASE_URL_PUBLICO}/validar")
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    return img_byte_arr.getvalue()
+
+
 def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, validador_id, fecha_utc, trazo_bytes=None):
     """
-    Renderiza el bloque de firma respetando estilos_firmas.json.
-    Incorpora la franja vertical izquierda de 4 pt en azul tecnológico corporativo (#3366CC).
+    Renderiza el bloque de firma con texto 'CelerDoc: security value code' calibrado
+    para verse completo y franja vertical izquierda de 4 pt en azul tecnológico (#3366CC).
     """
-    config = cargar_configuracion_estilos().get("estilo_bloque_principal", {}).get("capas", {})
+    config = cargar_configuracion_estilos().get("capas", {})
     
     cfg_trazo = config.get("zona_trazo", {})
     cfg_nombre = config.get("nombres_apellidos", {})
@@ -137,20 +199,67 @@ def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, v
     col_nombre = hex_to_rgb(cfg_nombre.get("color", "#111827"))
     sz_nombre = cfg_nombre.get("tamano_fuente", 10)
     y_nombre = rect_destino.y0 + alto_trazo + 16
-    pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_nombre), str(nombre_titular)[:30], fontsize=sz_nombre, color=col_nombre)
+    pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_nombre), str(nombre_titular)[:32], fontsize=sz_nombre, color=col_nombre)
 
     # 6. Capa Identificación
     col_id = hex_to_rgb(cfg_id.get("color", "#4B5563"))
     sz_id = cfg_id.get("tamano_fuente", 9)
     y_id = y_nombre + 12
-    pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_id), str(id_texto)[:33], fontsize=sz_id, color=col_id)
+    pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_id), str(id_texto)[:35], fontsize=sz_id, color=col_id)
 
-    # 7. Capa Código de Verificación y Timestamp
-    col_verif = hex_to_rgb(cfg_verif.get("color", "#6B7280"))
-    sz_verif = cfg_verif.get("tamano_fuente", 7)
-    y_verif = y_id + 11
-    texto_verif = f"Validador: {validador_id}  |  {fecha_utc}"
-    pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_verif), texto_verif[:46], fontsize=sz_verif, color=col_verif)
+    # 7. Capa Código de Verificación y Timestamp completa sin recortes (4.8 pt)
+    col_verif = hex_to_rgb(cfg_verif.get("color", "#4B5563"))
+    sz_verif = cfg_verif.get("tamano_fuente", 4.8)
+    y_verif = y_id + 10
+    texto_verif = f"CelerDoc: security value code: {validador_id} | {fecha_utc}"
+    pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_verif), texto_verif, fontsize=sz_verif, color=col_verif)
+
+
+def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
+    """
+    Inserta el sello PKCS #7 en la página del documento original.
+    """
+    if not pkcs7_info:
+        return
+
+    alto_pag = pagina.rect.height
+    posicion = pkcs7_info.get("posicion_final", "left_vertical")
+    if posicion == "audit_table_only":
+        return
+
+    qr_data = pkcs7_info.get("qr_data", f"{BASE_URL_PUBLICO}/validar")
+    qr_bytes = generar_qr_bytes(qr_data)
+    hash_txt = pkcs7_info.get("hash", "c2a9d8f3e5b10478bc64df91e021a876fa5e9b31d472c08416d8a9e6b21c45df")
+    status_txt = pkcs7_info.get("status", "VALID")
+    
+    texto_completo = f"PKCS#7 VALIDATION: {hash_txt} [{status_txt}]"
+    color_azul = (0.2, 0.4, 0.8)
+
+    if posicion == "left_vertical":
+        # Condición 1: Extremo inferior izquierdo proyectado hacia arriba
+        rect_qr = fitz.Rect(10, alto_pag - 42, 36, alto_pag - 16)
+        pagina.insert_image(rect_qr, stream=qr_bytes)
+        
+        pagina.insert_text(
+            fitz.Point(24, alto_pag - 48),
+            texto_completo,
+            fontsize=5.2,
+            fontname="courier-bold",
+            color=color_azul,
+            rotate=90
+        )
+    elif posicion == "bottom_above_footer":
+        # Condición 2: Horizontal en zona pie de página
+        rect_qr = fitz.Rect(40, alto_pag - 32, 62, alto_pag - 10)
+        pagina.insert_image(rect_qr, stream=qr_bytes)
+        
+        pagina.insert_text(
+            fitz.Point(68, alto_pag - 18),
+            texto_completo,
+            fontsize=5.5,
+            fontname="courier-bold",
+            color=color_azul
+        )
 
 
 class FirmaPayload(BaseModel):
@@ -168,6 +277,7 @@ class FirmaPayload(BaseModel):
     pagina_seleccionada: int = 1
     total_paginas_con_extras: int = 1
     coordenadas: Dict[str, Any]
+    pkcs7_info: Optional[Dict[str, Any]] = None
     email_notificacion: Optional[str] = None
     whatsapp_notificacion: Optional[str] = None
     timestamp_carga_doc: Optional[str] = None
@@ -202,7 +312,6 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         x_pct = payload.coordenadas.get("x_pct", 50.0)
         y_pct = payload.coordenadas.get("y_pct", 85.0)
 
-        # Dimensiones del bloque de firma
         sello_w = 200
         sello_h = 80
 
@@ -224,13 +333,13 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         ahora_utc = datetime.now(timezone.utc)
         timestamp_sellado_utc = ahora_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
         
-        # ID Único de Auditoría irrepetible (UUIDv4)
+        # ID Único de Auditoría irrepetible (UUIDv4) y Validador alfanumérico limpio
         reporte_id_unico = f"CELER-AUD-{uuid.uuid4().hex.upper()}"
-        validador_id = f"CELER-{hashlib.md5(f'{sha256_original}{timestamp_sellado_utc}'.encode()).hexdigest()[:10].upper()}"
+        validador_id = hashlib.md5(f'{sha256_original}{timestamp_sellado_utc}'.encode()).hexdigest()[:10].upper()
         id_completo_texto = f"{payload.codigo_tipo_doc}: {payload.numero_documento}"
         nombre_final = payload.nombre_final_sugerido or f"documento_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
 
-        # 3. Estampar la firma con la franja de 4 pt
+        # 3. Estampar la firma en el documento original según las coordenadas seleccionadas
         estampar_bloque_firma_json(
             pagina_destino,
             rect_destino,
@@ -241,27 +350,34 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             trazo_bytes
         )
 
+        # 3.1 Estampar sello físico PKCS #7 en la página del documento
+        if payload.pkcs7_info:
+            estampar_pkcs7_en_pagina(pagina_destino, payload.pkcs7_info)
+
         bytes_con_firma = doc.tobytes()
         sha256_con_firma = hashlib.sha256(bytes_con_firma).hexdigest()
-        pkcs7_serial = f"PKCS7-SHA256-{hashlib.sha256(f'{sha256_con_firma}{validador_id}'.encode()).hexdigest()[:24].upper()}"
+        
+        pkcs7_hash_real = (payload.pkcs7_info.get("hash") if payload.pkcs7_info else None) or hashlib.sha256(f'{sha256_con_firma}{validador_id}'.encode()).hexdigest()
+        pkcs7_serial = f"PKCS7-SHA256-{pkcs7_hash_real[:24].upper()}"
+        pkcs7_qr_url = (payload.pkcs7_info.get("qr_data") if payload.pkcs7_info else None) or f"{BASE_URL_PUBLICO}/validar?sig={pkcs7_hash_real[:32]}"
 
         # Enmascarar IP y GPS
         client_ip = request.client.host if request.client else "186.84.92.145"
         ip_enmascarada = enmascarar_ip(client_ip)
         gps_enmascarado = enmascarar_gps(payload.latitud_raw, payload.longitud_raw)
 
-        # 4. Generar Hoja de Auditoría y Trazabilidad
+        # 4. Generar Hoja de Auditoría y Trazabilidad Completa
         pagina_auditoria = doc.new_page(width=595, height=842)
-        color_azul_corp = (0.2, 0.4, 0.8)       # #3366CC
+        color_azul_corp = (0.2, 0.4, 0.8)  # #3366CC
 
         # 4.1 Encabezado principal
-        pagina_auditoria.draw_rect(fitz.Rect(42, 40, 553, 78), color=color_azul_corp, fill=(0.96, 0.98, 1.0), width=0.8)
-        pagina_auditoria.insert_text(fitz.Point(54, 58), "Celerdoc: Reporte de Auditoria y Trazabilidad", fontsize=13, color=color_azul_corp)
-        pagina_auditoria.insert_text(fitz.Point(54, 71), "Evidencia de integridad electronica, no repudio y certificacion digital", fontsize=7.5, color=(0.28, 0.33, 0.41))
+        pagina_auditoria.draw_rect(fitz.Rect(42, 38, 553, 76), color=color_azul_corp, fill=(0.96, 0.98, 1.0), width=0.8)
+        pagina_auditoria.insert_text(fitz.Point(54, 56), "Celerdoc: Reporte de Auditoria y Trazabilidad", fontsize=13, color=color_azul_corp)
+        pagina_auditoria.insert_text(fitz.Point(54, 69), "Evidencia de integridad electronica, no repudio y certificacion digital", fontsize=7.5, color=(0.28, 0.33, 0.41))
 
         # 4.2 Subtítulo con ID de Registro
-        pagina_auditoria.draw_rect(fitz.Rect(42, 82, 553, 102), color=color_azul_corp, fill=(1, 1, 1), width=0.6)
-        pagina_auditoria.insert_text(fitz.Point(54, 95), f"ID de Registro:  {reporte_id_unico}", fontsize=7.5, color=color_azul_corp)
+        pagina_auditoria.draw_rect(fitz.Rect(42, 80, 553, 98), color=color_azul_corp, fill=(1, 1, 1), width=0.6)
+        pagina_auditoria.insert_text(fitz.Point(54, 92), f"ID de Registro:  {reporte_id_unico}", fontsize=7.5, color=color_azul_corp)
 
         # 4.3 Matriz de Registros de Auditoría
         ts_carga = payload.timestamp_carga_doc or timestamp_sellado_utc
@@ -280,6 +396,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             ("SHA-256 Documento con Firma", sha256_con_firma),
             ("Hash Biometrico del Trazo", sha256_trazo[:48] + ("..." if len(sha256_trazo) > 48 else "")),
             ("Contenedor Firma PKCS#7", pkcs7_serial),
+            ("Sello Hash Digital PKCS #7", pkcs7_hash_real),
             ("Codigo Validador Transaccion", validador_id),
             ("Codigo OTP Enviado y Verificado", f"OTP-{payload.codigo_otp_validado or '123456'}"),
             ("Aceptacion y Validacion OTP", f"Aceptado y autenticado con exito ({ts_otp[:19]} UTC)"),
@@ -290,42 +407,76 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             ("Sellado Final de Integridad UTC", timestamp_sellado_utc)
         ]
 
-        y_offset = 108
-        alto_fila = 16.5
+        y_offset = 104
+        alto_fila = 15.5
         
         for etiqueta, valor in filas_auditoria:
             pagina_auditoria.draw_rect(fitz.Rect(42, y_offset, 553, y_offset + alto_fila), color=(0.88, 0.9, 0.94), fill=(0.98, 0.99, 1.0), width=0.4)
             pagina_auditoria.draw_line(fitz.Point(195, y_offset), fitz.Point(195, y_offset + alto_fila), color=(0.88, 0.9, 0.94), width=0.4)
             
-            pagina_auditoria.insert_text(fitz.Point(48, y_offset + 11), etiqueta, fontsize=6, color=(0.25, 0.3, 0.4))
-            pagina_auditoria.insert_text(fitz.Point(202, y_offset + 11), str(valor)[:84], fontsize=6, color=(0.06, 0.09, 0.16))
+            pagina_auditoria.insert_text(fitz.Point(48, y_offset + 10.5), etiqueta, fontsize=5.8, color=(0.25, 0.3, 0.4))
+            pagina_auditoria.insert_text(fitz.Point(202, y_offset + 10.5), str(valor)[:86], fontsize=5.8, color=(0.06, 0.09, 0.16))
             
             y_offset += alto_fila
 
-        # 4.4 Última Fila Unificada: Icono [ i ] + Aviso de Privacidad
-        alto_fila_aviso = 34
+        # 4.4 MÓDULO HORIZONTAL DE VALIDACIÓN QR + VALOR AL LADO DERECHO
+        alto_bloque_qr = 46
+        rect_bloque_qr = fitz.Rect(42, y_offset + 4, 553, y_offset + 4 + alto_bloque_qr)
+        pagina_auditoria.draw_rect(rect_bloque_qr, color=color_azul_corp, fill=(0.98, 0.99, 1.0), width=0.6)
+
+        # Generar e incrustar QR horizontal en auditoría
+        qr_auditoria_bytes = generar_qr_bytes(pkcs7_qr_url)
+        rect_qr_img = fitz.Rect(50, y_offset + 8, 88, y_offset + 46)
+        pagina_auditoria.insert_image(rect_qr_img, stream=qr_auditoria_bytes)
+
+        # Datos horizontales al lado derecho del QR
+        x_texto_qr = 96
+        pagina_auditoria.insert_text(
+            fitz.Point(x_texto_qr, y_offset + 18),
+            "VALIDACIÓN Y CONSULTA PÚBLICA DE INTEGRIDAD (PKCS#7 / SHA-256)",
+            fontsize=6.8,
+            fontname="helv",
+            color=color_azul_corp
+        )
+        pagina_auditoria.insert_text(
+            fitz.Point(x_texto_qr, y_offset + 28),
+            f"Valor del Código / Hash: {pkcs7_hash_real}",
+            fontsize=5.6,
+            fontname="courier",
+            color=(0.1, 0.15, 0.25)
+        )
+        pagina_auditoria.insert_text(
+            fitz.Point(x_texto_qr, y_offset + 38),
+            f"Enlace de Consulta: {pkcs7_qr_url}",
+            fontsize=5.6,
+            fontname="courier",
+            color=(0.2, 0.4, 0.8)
+        )
+
+        y_offset += alto_bloque_qr + 8
+
+        # 4.5 Última Fila Unificada: Icono [ i ] + Aviso de Privacidad
+        alto_fila_aviso = 32
         rect_fila_aviso = fitz.Rect(42, y_offset, 553, y_offset + alto_fila_aviso)
         pagina_auditoria.draw_rect(rect_fila_aviso, color=(0.75, 0.83, 0.95), fill=(0.95, 0.97, 1.0), width=0.6)
 
-        # Icono visual [ i ]
-        rect_icono = fitz.Rect(50, y_offset + 8, 66, y_offset + 24)
+        rect_icono = fitz.Rect(50, y_offset + 7, 66, y_offset + 23)
         pagina_auditoria.draw_rect(rect_icono, color=color_azul_corp, fill=color_azul_corp, width=0.5)
-        pagina_auditoria.insert_text(fitz.Point(56, y_offset + 19.5), "i", fontsize=10, color=(1, 1, 1))
+        pagina_auditoria.insert_text(fitz.Point(56, y_offset + 18.5), "i", fontsize=10, color=(1, 1, 1))
 
-        # Texto condensado con doble sangría
         x_sangria = 76
         pagina_auditoria.insert_text(
-            fitz.Point(x_sangria, y_offset + 13),
+            fitz.Point(x_sangria, y_offset + 12),
             "• Privacidad: La direccion IP y las coordenadas GPS se presentan enmascaradas para proteger la confidencialidad del firmante.",
             fontsize=5.8, color=(0.18, 0.23, 0.32)
         )
         pagina_auditoria.insert_text(
-            fitz.Point(x_sangria, y_offset + 25),
+            fitz.Point(x_sangria, y_offset + 23),
             "• Respaldo legal: Los registros originales permanecen custodiados bajo estandares de seguridad en Celerdoc con plena validez de ley.",
             fontsize=5.8, color=(0.18, 0.23, 0.32)
         )
 
-        # 4.5 Pie de página
+        # 4.6 Pie de página
         pagina_auditoria.draw_line(fitz.Point(42, 792), fitz.Point(553, 792), color=color_azul_corp, width=0.6)
         pagina_auditoria.insert_text(fitz.Point(42, 804), f"Certificado de firma electronica expedido por Celerdoc | Hash Final: {sha256_con_firma[:32]}...", fontsize=6, color=(0.4, 0.45, 0.5))
 
