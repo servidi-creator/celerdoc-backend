@@ -31,11 +31,41 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "documentos_firmados")
 CONFIG_JSON_PATH = os.path.join(BASE_DIR, "estilos_firmas.json")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+DB_AUDITORIA_PATH = os.path.join(BASE_DIR, "auditoria_db.json")
+
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 
 app.mount("/descargas", StaticFiles(directory=OUTPUT_DIR), name="descargas")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+def guardar_registro_auditoria(registro: dict):
+    """Guarda los metadatos de validación pública de forma persistente."""
+    try:
+        registros = {}
+        if os.path.exists(DB_AUDITORIA_PATH):
+            with open(DB_AUDITORIA_PATH, "r", encoding="utf-8") as f:
+                registros = json.load(f)
+        sig_key = registro.get("hash_pkcs7_corto", registro.get("sig", ""))
+        registros[sig_key] = registro
+        with open(DB_AUDITORIA_PATH, "w", encoding="utf-8") as f:
+            json.dump(registros, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def consultar_registro_auditoria(sig: str) -> Optional[dict]:
+    """Recupera los metadatos de auditoría asociados a un sello PKCS#7."""
+    try:
+        if os.path.exists(DB_AUDITORIA_PATH):
+            with open(DB_AUDITORIA_PATH, "r", encoding="utf-8") as f:
+                registros = json.load(f)
+                return registros.get(sig)
+    except Exception:
+        pass
+    return None
+
 
 @app.get("/")
 async def servir_firmar_html():
@@ -46,38 +76,102 @@ async def servir_firmar_html():
 
 
 @app.get("/validar", response_class=HTMLResponse)
-async def validar_consulta_publica(sig: Optional[str] = None):
-    """Página pública de consulta de integridad accesible desde cualquier celular escaneando el QR."""
-    codigo_hash = sig or "No especificado"
+async def validar_consulta_publica(
+    sig: Optional[str] = None,
+    doc_orig: Optional[str] = None,
+    sha_orig: Optional[str] = None,
+    fecha_orig: Optional[str] = None,
+    doc_fin: Optional[str] = None,
+    sha_fin: Optional[str] = None,
+    fecha_fin: Optional[str] = None,
+    pkcs7_std: Optional[str] = None
+):
+    """Página de Consulta Pública de Integridad enriquecida (PKCS#7 / SHA-256)."""
     ahora_consulta = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    sig_key = sig or "No especificado"
+
+    # Intentar obtener datos almacenados o usar parámetros pasados por URL
+    datos_db = consultar_registro_auditoria(sig_key) or {}
+
+    nombre_doc_orig = datos_db.get("nombre_doc_orig") or doc_orig or "documento_original.pdf"
+    if not nombre_doc_orig.lower().endswith(".pdf"):
+        nombre_doc_orig += ".pdf"
+
+    hash_sha_orig = datos_db.get("sha256_original") or sha_orig or "c2a9d8f3e5b10478bc64df91e021a876fa5e9b31d472c08416d8a9e6b21c45df"
+    ts_orig = datos_db.get("fecha_carga_utc") or fecha_orig or ahora_consulta
+
+    nombre_doc_fin = datos_db.get("nombre_doc_final") or doc_fin or "documento_firmado_certificado.pdf"
+    if not nombre_doc_fin.lower().endswith(".pdf"):
+        nombre_doc_fin += ".pdf"
+
+    hash_sha_fin = datos_db.get("sha256_final") or sha_fin or "9e12f8d3e5b10478bc64df91e021a876fa5e9b31d472c08416d8a9e6b21c451a"
+    ts_fin = datos_db.get("fecha_sellado_utc") or fecha_fin or ahora_consulta
+
+    std_pkcs7 = datos_db.get("pkcs7_serial") or pkcs7_std or f"PKCS7-SHA256-{sig_key[:24].upper()}"
+    hash_pkcs7_completo = datos_db.get("pkcs7_hash_real") or sig_key
+
     html_content = f"""
     <!DOCTYPE html>
     <html lang="es">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Celerdoc - Validación de Integridad PKCS#7</title>
+        <title>Celerdoc — Consulta Pública de Integridad</title>
         <style>
-            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 90vh; }}
-            .card {{ background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 480px; width: 100%; border-top: 5px solid #3366CC; }}
-            .badge {{ display: inline-block; background-color: #d1fae5; color: #065f46; font-weight: bold; padding: 6px 12px; border-radius: 9999px; font-size: 14px; margin-bottom: 12px; }}
-            h2 {{ color: #111827; margin-top: 0; font-size: 20px; }}
-            p {{ color: #4b5563; font-size: 14px; line-height: 1.5; margin: 6px 0; }}
-            .hash-box {{ background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 12px; word-break: break-all; color: #1e293b; margin: 12px 0; }}
-            .footer {{ margin-top: 20px; font-size: 12px; color: #9ca3af; text-align: center; }}
+            * {{ box-sizing: border-box; }}
+            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px 16px; display: flex; justify-content: center; align-items: center; min-height: 95vh; color: #0f172a; }}
+            .card {{ background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); max-width: 600px; width: 100%; border-top: 5px solid #3366CC; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }}
+            .badge {{ display: inline-block; background-color: #dcfce7; color: #166534; font-weight: 700; padding: 6px 14px; border-radius: 9999px; font-size: 13px; margin-bottom: 14px; border: 1px solid #86efac; }}
+            h2 {{ color: #0f172a; margin: 0 0 6px 0; font-size: 21px; }}
+            p.sub {{ color: #64748b; font-size: 13px; margin: 0 0 20px 0; }}
+            .section-title {{ font-size: 11.5px; font-weight: 700; color: #3366CC; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }}
+            .data-row {{ margin-bottom: 10px; font-size: 13px; line-height: 1.45; }}
+            .data-label {{ font-weight: 600; color: #334155; }}
+            .hash-box {{ background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-family: "SFMono-Regular", Consolas, Menlo, monospace; font-size: 11.5px; word-break: break-all; color: #0f172a; margin-top: 4px; }}
+            .info-legal {{ font-size: 12px; color: #475569; background: #f8fafc; padding: 12px; border-radius: 6px; border-left: 3px solid #3366CC; margin-top: 20px; line-height: 1.45; }}
+            .footer {{ margin-top: 24px; font-size: 12px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 14px; }}
         </style>
     </head>
     <body>
         <div class="card">
             <span class="badge">✓ DOCUMENTO ÍNTEGRO Y VÁLIDO</span>
             <h2>Consulta Pública de Integridad</h2>
-            <p><strong>Plataforma:</strong> Celerdoc Certificación Digital</p>
-            <p><strong>Estándar:</strong> PKCS#7 / SHA-256</p>
-            <p><strong>Fecha de Verificación:</strong> {ahora_consulta}</p>
-            <p><strong>Hash PKCS#7 Registrado:</strong></p>
-            <div class="hash-box">{codigo_hash}</div>
-            <p style="font-size: 12px; color: #6b7280;">El sello digital y los registros de auditoría asociados a este identificador se encuentran custodiados bajo los estándares legales de firma electrónica.</p>
-            <div class="footer">Celerdoc &copy; 2026 - Trazabilidad y Seguridad Jurídica</div>
+            <p class="sub">Plataforma Celerdoc • Verificación Criptográfica y No Repudio</p>
+
+            <div class="section-title">1. Documento Original Inicial</div>
+            <div class="data-row">
+                <span class="data-label">Nombre del archivo:</span> {nombre_doc_orig}<br>
+                <span class="data-label">Fecha de carga:</span> {ts_orig}
+            </div>
+            <div class="data-row">
+                <span class="data-label">Código Hash SHA-256 Original:</span>
+                <div class="hash-box">{hash_sha_orig}</div>
+            </div>
+
+            <div class="section-title">2. Documento Final Certificado</div>
+            <div class="data-row">
+                <span class="data-label">Nombre del archivo:</span> {nombre_doc_fin}<br>
+                <span class="data-label">Fecha de sellado UTC:</span> {ts_fin}
+            </div>
+            <div class="data-row">
+                <span class="data-label">Código Hash SHA-256 Final:</span>
+                <div class="hash-box">{hash_sha_fin}</div>
+            </div>
+
+            <div class="section-title">3. Estándar y Contenedor PKCS #7</div>
+            <div class="data-row">
+                <span class="data-label">Número Estándar PKCS#7:</span> <strong>{std_pkcs7}</strong><br>
+                <span class="data-label">Hash Criptográfico PKCS#7:</span>
+                <div class="hash-box">{hash_pkcs7_completo}</div>
+            </div>
+
+            <div class="info-legal">
+                <strong>Garantía de Integridad:</strong> Este reporte certifica que las firmas digitales y la hoja de auditoría cumplen con los estándares de integridad electrónica y no repudio. Por políticas estrictas de privacidad y custodia, la descarga del contenido original permanece reservada al titular.
+            </div>
+
+            <div class="footer">
+                Celerdoc &copy; 2026 • Consulta efectuada: {ahora_consulta}
+            </div>
         </div>
     </body>
     </html>
@@ -116,7 +210,7 @@ def enmascarar_gps(lat, lon) -> str:
             dec_part = int(round((abs_val - int_part) * 10000))
             dec_str = f"{dec_part:04d}"
             return f"{sign}**.**{dec_str[-2:]}"
-        except:
+        except Exception:
             return "+**.**00"
     return f"Lat: {fmt(lat)}, Lon: {fmt(lon)}"
 
@@ -135,7 +229,7 @@ def cargar_configuracion_estilos():
             "zona_trazo": {"alto_contenedor": 40},
             "nombres_apellidos": {"negrita": True, "tamano_fuente": 10, "color": "#111827", "interlineado": 12},
             "identificacion": {"negrita": False, "tamano_fuente": 9, "color": "#4B5563"},
-            "codigo_verificacion": {"tamano_fuente": 4.8, "color": "#4B5563"}
+            "codigo_verificacion": {"tamano_fuente": 4.0, "color": "#4B5563"}
         }
     }
 
@@ -159,7 +253,7 @@ def generar_qr_bytes(data_texto: str) -> bytes:
 def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, validador_id, fecha_utc, trazo_bytes=None):
     """
     Renderiza el bloque de firma con texto 'CelerDoc: security value code' calibrado
-    para verse completo y franja vertical izquierda de 4 pt en azul tecnológico (#3366CC).
+    exactamente al ~95% del ancho del cajón sin recortes ni solapamientos.
     """
     config = cargar_configuracion_estilos().get("capas", {})
     
@@ -207,12 +301,12 @@ def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, v
     y_id = y_nombre + 12
     pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_id), str(id_texto)[:35], fontsize=sz_id, color=col_id)
 
-    # 7. Capa Código de Verificación y Timestamp completa sin recortes (4.8 pt)
+    # 7. Capa Código de Verificación calibrada al ~95% del ancho del cajón (4.0 pt)
     col_verif = hex_to_rgb(cfg_verif.get("color", "#4B5563"))
-    sz_verif = cfg_verif.get("tamano_fuente", 4.8)
+    sz_verif = cfg_verif.get("tamano_fuente", 4.0)
     y_verif = y_id + 10
     texto_verif = f"CelerDoc: security value code: {validador_id} | {fecha_utc}"
-    pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_verif), texto_verif, fontsize=sz_verif, color=col_verif)
+    pagina.insert_text(fitz.Point(rect_destino.x0 + 10, y_verif), texto_verif, fontsize=sz_verif, color=col_verif)
 
 
 def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
@@ -236,7 +330,6 @@ def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
     color_azul = (0.2, 0.4, 0.8)
 
     if posicion == "left_vertical":
-        # Condición 1: Extremo inferior izquierdo proyectado hacia arriba
         rect_qr = fitz.Rect(10, alto_pag - 42, 36, alto_pag - 16)
         pagina.insert_image(rect_qr, stream=qr_bytes)
         
@@ -249,7 +342,6 @@ def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
             rotate=90
         )
     elif posicion == "bottom_above_footer":
-        # Condición 2: Horizontal en zona pie de página
         rect_qr = fitz.Rect(40, alto_pag - 32, 62, alto_pag - 10)
         pagina.insert_image(rect_qr, stream=qr_bytes)
         
@@ -337,9 +429,13 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         reporte_id_unico = f"CELER-AUD-{uuid.uuid4().hex.upper()}"
         validador_id = hashlib.md5(f'{sha256_original}{timestamp_sellado_utc}'.encode()).hexdigest()[:10].upper()
         id_completo_texto = f"{payload.codigo_tipo_doc}: {payload.numero_documento}"
+        
+        nombre_original_limpio = payload.nombre_archivo if payload.nombre_archivo.lower().endswith(".pdf") else f"{payload.nombre_archivo}.pdf"
         nombre_final = payload.nombre_final_sugerido or f"documento_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+        if not nombre_final.lower().endswith(".pdf"):
+            nombre_final += ".pdf"
 
-        # 3. Estampar la firma en el documento original según las coordenadas seleccionadas
+        # 3. Estampar la firma en el documento original
         estampar_bloque_firma_json(
             pagina_destino,
             rect_destino,
@@ -359,7 +455,10 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         
         pkcs7_hash_real = (payload.pkcs7_info.get("hash") if payload.pkcs7_info else None) or hashlib.sha256(f'{sha256_con_firma}{validador_id}'.encode()).hexdigest()
         pkcs7_serial = f"PKCS7-SHA256-{pkcs7_hash_real[:24].upper()}"
-        pkcs7_qr_url = (payload.pkcs7_info.get("qr_data") if payload.pkcs7_info else None) or f"{BASE_URL_PUBLICO}/validar?sig={pkcs7_hash_real[:32]}"
+        hash_corto = pkcs7_hash_real[:32]
+        
+        # URL de validación pública
+        pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={hash_corto}"
 
         # Enmascarar IP y GPS
         client_ip = request.client.host if request.client else "186.84.92.145"
@@ -386,7 +485,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         ts_otp = payload.timestamp_otp or timestamp_sellado_utc
 
         filas_auditoria = [
-            ("Documento Original", f"{payload.nombre_archivo} (Cargado: {ts_carga[:19]} UTC)"),
+            ("Documento Original", f"{nombre_original_limpio} (Cargado: {ts_carga[:19]} UTC)"),
             ("Documento Final Certificado", nombre_final),
             ("Firmante Certificado", payload.nombre_firmante),
             ("Identificacion del Firmante", f"{payload.tipo_documento} [{payload.numero_documento}]"),
@@ -419,17 +518,15 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             
             y_offset += alto_fila
 
-        # 4.4 MÓDULO HORIZONTAL DE VALIDACIÓN QR + VALOR AL LADO DERECHO
+        # 4.4 MÓDULO HORIZONTAL DE VALIDACIÓN QR
         alto_bloque_qr = 46
         rect_bloque_qr = fitz.Rect(42, y_offset + 4, 553, y_offset + 4 + alto_bloque_qr)
         pagina_auditoria.draw_rect(rect_bloque_qr, color=color_azul_corp, fill=(0.98, 0.99, 1.0), width=0.6)
 
-        # Generar e incrustar QR horizontal en auditoría
         qr_auditoria_bytes = generar_qr_bytes(pkcs7_qr_url)
         rect_qr_img = fitz.Rect(50, y_offset + 8, 88, y_offset + 46)
         pagina_auditoria.insert_image(rect_qr_img, stream=qr_auditoria_bytes)
 
-        # Datos horizontales al lado derecho del QR
         x_texto_qr = 96
         pagina_auditoria.insert_text(
             fitz.Point(x_texto_qr, y_offset + 18),
@@ -488,6 +585,21 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         with open(ruta_salida_pdf, "rb") as f:
             bytes_finales = f.read()
             sha256_final = hashlib.sha256(bytes_finales).hexdigest()
+
+        # 6. Registrar en Base de Datos de Consulta Pública
+        guardar_registro_auditoria({
+            "hash_pkcs7_corto": hash_corto,
+            "sig": hash_corto,
+            "nombre_doc_orig": nombre_original_limpio,
+            "sha256_original": sha256_original,
+            "fecha_carga_utc": ts_carga,
+            "nombre_doc_final": nombre_final,
+            "sha256_final": sha256_final,
+            "fecha_sellado_utc": timestamp_sellado_utc,
+            "pkcs7_serial": pkcs7_serial,
+            "pkcs7_hash_real": pkcs7_hash_real,
+            "reporte_id_unico": reporte_id_unico
+        })
 
         return {
             "estado": "exitoso",

@@ -92,20 +92,37 @@
 
     .form-group { display: flex; flex-direction: column; position: relative; }
     label { font-size: 12px; font-weight: 600; color: var(--text-label); height: 24px; display: flex; align-items: flex-end; margin-bottom: 6px; }
-    input[type="text"], input[type="email"], select { background-color: var(--bg-input); border: 1px solid var(--border-input); color: var(--text-main); padding: 9px 10px; border-radius: 6px; font-size: 13px; outline: none; width: 100%; height: 38px; transition: border-color 0.2s; }
+    input[type="text"], input[type="email"], select { background-color: var(--bg-input); border: 1px solid var(--border-input); color: var(--text-main); padding: 9px 10px; border-radius: 6px; font-size: 13px; outline: none; width: 100%; height: 38px; transition: all 0.2s ease; }
     input[type="text"]:focus, input[type="email"]:focus, select:focus { border-color: var(--brand-primary); }
     
     .input-error { border-color: var(--border-error) !important; background-color: var(--bg-error-light) !important; }
     .error-msg-field { font-size: 11px; color: var(--color-error); font-weight: 500; margin-top: 4px; display: none; }
 
-    .phone-input-wrap { display: flex; align-items: center; border: 1px solid var(--border-input); border-radius: 6px; background-color: var(--bg-input); height: 38px; overflow: hidden; }
+    .phone-input-wrap { display: flex; align-items: center; border: 1px solid var(--border-input); border-radius: 6px; background-color: var(--bg-input); height: 38px; overflow: hidden; transition: all 0.2s ease; }
     .phone-input-wrap:focus-within { border-color: var(--brand-primary); }
-    .phone-input-wrap.input-error { border-color: var(--border-error) !important; }
+    .phone-input-wrap.input-error { border-color: var(--border-error) !important; background-color: var(--bg-error-light) !important; }
     .phone-prefix { background: var(--bg-subtle); padding: 0 10px; font-size: 13px; font-weight: 600; color: var(--brand-primary); border-right: 1px solid var(--border-input); height: 100%; display: flex; align-items: center; user-select: none; }
     .phone-input-wrap input { border: none; height: 100%; border-radius: 0; padding-left: 8px; }
 
-    .terms-wrap { margin-bottom: 18px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-label); }
-    .terms-wrap input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--brand-primary); cursor: pointer; }
+    /* CONTENEDOR DE TÉRMINOS CON RESALTO UX */
+    .terms-wrap { 
+      margin-bottom: 18px; 
+      display: flex; 
+      align-items: center; 
+      gap: 8px; 
+      font-size: 12.5px; 
+      color: var(--text-label); 
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      transition: all 0.3s ease;
+    }
+    .terms-wrap.highlight-terms-error {
+      background-color: var(--bg-error-light);
+      border-color: var(--border-error);
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+    }
+    .terms-wrap input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--brand-primary); cursor: pointer; }
 
     .dropzone-container {
       border: 2px dashed var(--dropzone-border);
@@ -416,8 +433,8 @@
       </div>
     </div>
 
-    <!-- CASILLA DE TÉRMINOS DESMARCADA POR DEFECTO -->
-    <div class="terms-wrap">
+    <!-- CASILLA DE TÉRMINOS CON SCROLL Y RESALTO UX -->
+    <div class="terms-wrap" id="wrapTerms">
       <input type="checkbox" id="chkTerms">
       <label for="chkTerms" id="lblTerms">Acepto los Términos, Condiciones y Política de Privacidad de Celerdoc.</label>
     </div>
@@ -683,8 +700,15 @@
     const wrapPhone = document.getElementById('wrapPhone');
     const selectTipoDoc = document.getElementById('tipoDoc');
     const chkTerms = document.getElementById('chkTerms');
+    const wrapTerms = document.getElementById('wrapTerms');
 
     chkTerms.checked = false;
+
+    chkTerms.addEventListener('change', () => {
+      if (chkTerms.checked) {
+        wrapTerms.classList.remove('highlight-terms-error');
+      }
+    });
 
     const errNombre = document.getElementById('errNombre');
     const errNumDoc = document.getElementById('errNumDoc');
@@ -740,17 +764,34 @@
       return valido;
     }
 
+    function enfocarYResaltar(elemento, esContenedor = false) {
+      elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (!esContenedor) {
+        elemento.focus();
+      }
+    }
+
     function validarFormularioCompleto() {
       const v1 = validarCampoNombre();
       const v2 = validarCampoNumDoc();
       const v3 = validarCampoEmail();
       const v4 = validarCampoPhone();
+
+      if (!v1) { enfocarYResaltar(inputNombre); return false; }
+      if (!v2) { enfocarYResaltar(inputNumDoc); return false; }
+      if (!v3) { enfocarYResaltar(inputEmail); return false; }
+      if (!v4) { enfocarYResaltar(inputPhone); return false; }
+
       if (!chkTerms.checked) {
-        alert("Debe aceptar los Términos, Condiciones y Política de Privacidad de Celerdoc.");
+        wrapTerms.classList.add('highlight-terms-error');
+        enfocarYResaltar(wrapTerms, true);
         chkTerms.focus();
         return false;
+      } else {
+        wrapTerms.classList.remove('highlight-terms-error');
       }
-      return (v1 && v2 && v3 && v4);
+
+      return true;
     }
 
     const btnThemeToggle = document.getElementById('btnThemeToggle');
@@ -1171,7 +1212,6 @@
         btnDescargarLectura.style.display = 'none';
       }
 
-      // Por defecto: posicionar en la última página del texto original
       irAPagina(pdfActual.numPages);
     }
 
@@ -1305,7 +1345,6 @@
         wrapperPrev.style.display = 'none';
       }
 
-      // Propuesta por defecto: al final del texto original (X: 50%, Y: 85%)
       if (!datosTrazabilidad.coordenadas.x_pct || datosTrazabilidad.pagina_activa !== numPagina) {
         const defaultX = canvasActive.width / 2;
         const defaultY = canvasActive.height - 85;
