@@ -5,7 +5,6 @@ import uuid
 import base64
 import hashlib
 from datetime import datetime, timezone
-import urllib.parse
 import traceback
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -79,46 +78,25 @@ async def servir_firmar_html():
 @app.get("/validar", response_class=HTMLResponse)
 async def validar_consulta_publica(
     request: Request,
-    sig: Optional[str] = None,
-    doc_orig: Optional[str] = None,
-    sha_orig: Optional[str] = None,
-    fecha_orig: Optional[str] = None,
-    doc_fin: Optional[str] = None,
-    sha_fin: Optional[str] = None,
-    fecha_fin: Optional[str] = None,
-    pkcs7_std: Optional[str] = None,
-    firmante: Optional[str] = None,
-    audit_id: Optional[str] = None
+    sig: Optional[str] = None
 ):
-    """Página de Consulta Pública ordenada estrictamente con los campos requeridos."""
+    """Página de Consulta Pública que recupera los datos exactos desde la BD local mediante el token 'sig'."""
     ahora_consulta = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     sig_key = sig or "No especificado"
 
     datos_db = consultar_registro_auditoria(sig_key) or {}
 
-    nombre_doc_orig = doc_orig or datos_db.get("nombre_doc_orig") or "documento_original.pdf"
-    if not nombre_doc_orig.lower().endswith(".pdf"):
-        nombre_doc_orig += ".pdf"
-
-    hash_sha_orig = sha_orig or datos_db.get("sha256_original") or "No disponible"
-    ts_orig = fecha_orig or datos_db.get("fecha_carga_utc") or ahora_consulta
-
-    nombre_doc_fin = doc_fin or datos_db.get("nombre_doc_final") or "documento_firmado_certificado.pdf"
-    if not nombre_doc_fin.lower().endswith(".pdf"):
-        nombre_doc_fin += ".pdf"
-
-    hash_sha_fin = sha_fin or datos_db.get("sha256_con_firma") or datos_db.get("sha256_final") or "No disponible"
-    ts_fin = fecha_fin or datos_db.get("fecha_sellado_utc") or ahora_consulta
-
-    nombre_firmante_candidato = firmante or datos_db.get("firmante_registrado") or datos_db.get("nombre_firmante") or "Firmante Registrado"
-    firmante_registrado = str(nombre_firmante_candidato).replace("*", "").strip()
-    if not firmante_registrado:
-        firmante_registrado = "Firmante Registrado"
-
-    std_pkcs7 = pkcs7_std or datos_db.get("pkcs7_serial") or f"PKCS7-SHA256-{sig_key[:24].upper()}"
-    hash_pkcs7_completo = datos_db.get("pkcs7_hash_real") or sig_key
-    reporte_id = audit_id or datos_db.get("reporte_id_unico") or "CELER-AUD-VERIFIED"
+    reporte_id = datos_db.get("reporte_id_unico", "CELER-AUD-VERIFIED")
+    firmante_registrado = str(datos_db.get("firmante_registrado", datos_db.get("nombre_firmante", "Firmante Registrado"))).replace("*", "").strip()
+    nombre_doc_orig = datos_db.get("nombre_doc_orig", "documento_original.pdf")
+    ts_orig = datos_db.get("fecha_carga_utc", ahora_consulta)
+    hash_sha_orig = datos_db.get("sha256_original", "No disponible")
+    nombre_doc_fin = datos_db.get("nombre_doc_final", "documento_firmado_certificado.pdf")
+    ts_fin = datos_db.get("fecha_sellado_utc", ahora_consulta)
     total_paginas_txt = datos_db.get("total_paginas_certificadas", "Páginas originales + Hoja de auditoría")
+    hash_sha_fin = datos_db.get("sha256_con_firma", datos_db.get("sha256_final", "No disponible"))
+    std_pkcs7 = datos_db.get("pkcs7_serial", f"PKCS7-SHA256-{sig_key[:24].upper()}")
+    hash_pkcs7_completo = datos_db.get("pkcs7_hash_real", sig_key)
 
     html_content = f"""
     <!DOCTYPE html>
@@ -343,12 +321,12 @@ def cargar_configuracion_estilos():
 
 
 def generar_qr_bytes(data_texto: str) -> bytes:
-    """Genera código QR nítido para incrustar en el documento PDF."""
+    """Genera código QR limpio, ampliado (box_size=4) y fácil de leer para cualquier cámara móvil."""
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=3,
-        border=1,
+        box_size=4,
+        border=2,
     )
     qr.add_data(data_texto if data_texto else f"{BASE_URL_PUBLICO}/validar")
     qr.make(fit=True)
@@ -635,22 +613,14 @@ async def procesar_firma(payload: FirmaPayload, request: Request, background_tas
         sha256_final_certificado = hashlib.sha256(f"{sha256_original}{sha256_trazo}{validador_id}".encode()).hexdigest()
 
         firmante_completo = str(payload.nombre_firmante).strip()
-        firmante_enc = urllib.parse.quote(firmante_completo)
-        doc_orig_enc = urllib.parse.quote(nombre_original_limpio)
-        doc_fin_enc = urllib.parse.quote(nombre_final)
-
         ts_carga = payload.timestamp_carga_doc or timestamp_sellado_utc
         ts_terms = payload.timestamp_terminos or timestamp_sellado_utc
         ts_trazo = payload.timestamp_trazo or timestamp_sellado_utc
         ts_otp = payload.timestamp_otp or timestamp_sellado_utc
         total_pags_cert = f"{payload.total_paginas_con_extras + 1} paginas (incluye hoja de auditoria)"
 
-        pkcs7_qr_url = (
-            f"{BASE_URL_PUBLICO}/validar?sig={hash_corto}"
-            f"&doc_orig={doc_orig_enc}&sha_orig={sha256_original}"
-            f"&doc_fin={doc_fin_enc}&sha_fin={sha256_final_certificado}"
-            f"&firmante={firmante_enc}&pkcs7_std={pkcs7_serial}&audit_id={reporte_id_unico}"
-        )
+        # Enlace QR ultra corto optimizado para lectura instantánea en cualquier cámara móvil
+        pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={hash_corto}"
 
         client_ip = request.client.host if request.client else "186.84.92.145"
         ip_enmascarada = enmascarar_ip(client_ip)

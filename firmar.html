@@ -330,13 +330,6 @@
       transform: rotate(-90deg) translateY(100%);
     }
 
-    .pkcs7-pos-bottom-footer {
-      position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
@@ -384,23 +377,55 @@
     #canvasFullscreenPad { width: 100%; height: 100%; display: block; border-radius: 6px; }
     .pad-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; color: #94a3b8; pointer-events: none; font-weight: 400; }
 
-    .image-pad-container {
+    /* ESTILO PREMIUM PARA CARGA DE IMAGEN DE FIRMA */
+    .image-drop-zone {
       width: 100%;
       height: 210px;
-      background: #ffffff;
-      border: 2px dashed var(--border-input);
+      background: linear-gradient(180deg, var(--dropzone-bg) 0%, rgba(51, 102, 204, 0.04) 100%);
+      border: 2px dashed var(--dropzone-border);
       border-radius: 8px;
       position: relative;
       margin-bottom: 14px;
       display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .image-drop-zone:hover {
+      border-color: var(--brand-primary-hover);
+      background: linear-gradient(180deg, rgba(51, 102, 204, 0.12) 0%, rgba(51, 102, 204, 0.05) 100%);
+    }
+    .image-upload-btn-ui {
+      background: var(--brand-primary);
+      color: #ffffff;
+      font-size: 13.5px;
+      font-weight: 600;
+      padding: 9px 20px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      box-shadow: 0 3px 8px rgba(51, 102, 204, 0.25);
+    }
+    .image-preview-wrapper {
+      width: 100%;
+      height: 210px;
+      background: #ffffff;
+      border: 1.5px solid var(--border-input);
+      border-radius: 8px;
+      position: relative;
+      margin-bottom: 14px;
+      display: none;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      cursor: pointer;
     }
     #imgFirmaPreview {
-      max-width: 90%;
-      max-height: 90%;
+      max-width: 85%;
+      max-height: 85%;
       object-fit: contain;
       user-select: none;
     }
@@ -598,20 +623,23 @@
           </div>
         </div>
 
-        <!-- Pestaña 2: Imagen de Firma -->
+        <!-- Pestaña 2: Imagen de Firma con UX Premium -->
         <div class="tab-content" id="tabContentImagen">
-          <div class="image-pad-container" id="imagePadContainer" onclick="document.getElementById('inputImgFirma').click()">
-            <img id="imgFirmaPreview" alt="Firma subida" style="display:none;">
-            <span class="pad-placeholder" id="imgPlaceholder">
-              📂 Clic aquí para seleccionar archivo de imagen (PNG / JPG / WEBP)
-            </span>
+          <div class="image-drop-zone" id="imageDropZone" onclick="document.getElementById('inputImgFirma').click()">
+            <div class="image-upload-btn-ui">📂 Seleccionar Archivo de Imagen</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Formatos compatibles: PNG, JPG, WEBP, SVG (Fondo transparente recomendado)</div>
           </div>
+
+          <div class="image-preview-wrapper" id="imagePreviewWrapper">
+            <img id="imgFirmaPreview" alt="Previsualización de Firma">
+          </div>
+
           <input type="file" id="inputImgFirma" accept="image/png, image/jpeg, image/webp, image/svg+xml">
           
           <div class="image-controls-bar" id="imgControlsBar" style="display:none;">
-            <span>Tamaño Proporcional:</span>
+            <span>Ajustar Escala:</span>
             <input type="range" id="rangeImgScale" min="40" max="160" value="100">
-            <button type="button" class="btn-control" id="btnCambiarImg" onclick="document.getElementById('inputImgFirma').click()">Reemplazar imagen</button>
+            <button type="button" class="btn-control" onclick="document.getElementById('inputImgFirma').click()">Cambiar imagen</button>
           </div>
         </div>
 
@@ -623,6 +651,7 @@
       </div>
     </div>
 
+    <!-- MODAL OTP CON AUTO-CONFIRMACIÓN AL 6º DÍGITO -->
     <div class="modal-overlay" id="modalOtp">
       <div class="modal-card">
         <h3 id="txtOtpTitulo">Verificación de Identidad por OTP</h3>
@@ -1097,8 +1126,9 @@
     const fullscreenPadPlaceholder = document.getElementById('fullscreenPadPlaceholder');
     
     const inputImgFirma = document.getElementById('inputImgFirma');
+    const imageDropZone = document.getElementById('imageDropZone');
+    const imagePreviewWrapper = document.getElementById('imagePreviewWrapper');
     const imgFirmaPreview = document.getElementById('imgFirmaPreview');
-    const imgPlaceholder = document.getElementById('imgPlaceholder');
     const imgControlsBar = document.getElementById('imgControlsBar');
     const rangeImgScale = document.getElementById('rangeImgScale');
 
@@ -1135,8 +1165,8 @@
         reader.onload = (event) => {
           imagenFirmaCargadaBase64 = event.target.result;
           imgFirmaPreview.src = imagenFirmaCargadaBase64;
-          imgFirmaPreview.style.display = 'block';
-          imgPlaceholder.style.display = 'none';
+          imageDropZone.style.display = 'none';
+          imagePreviewWrapper.style.display = 'flex';
           imgControlsBar.style.display = 'flex';
           rangeImgScale.value = 100;
           imgFirmaPreview.style.transform = `scale(1.0)`;
@@ -1230,8 +1260,8 @@
         datosTrazabilidad.trazo_firma_png = '';
       } else {
         imgFirmaPreview.src = '';
-        imgFirmaPreview.style.display = 'none';
-        imgPlaceholder.style.display = 'block';
+        imagePreviewWrapper.style.display = 'none';
+        imageDropZone.style.display = 'flex';
         imgControlsBar.style.display = 'none';
         inputImgFirma.value = '';
         imagenFirmaCargadaBase64 = '';
@@ -1284,6 +1314,48 @@
       modalOtp.style.display = 'flex';
       setTimeout(() => inputOtp.focus(), 100);
     });
+
+    // LÓGICA OTP CON AUTO-CONFIRMACIÓN AL LLEGAR AL 6º DÍGITO
+    function verificarYEjecutarOtp() {
+      const codigo = inputOtp.value.trim();
+      if (codigo.length === 6) {
+        if (codigo === CODIGO_OTP_SIMULADO) {
+          timestampOtpValidadoUtc = new Date().toISOString();
+          otpErrorMsg.textContent = '';
+          modalOtp.style.display = 'none';
+          ejecutarProcesoFirmaBackend(codigo);
+        } else {
+          intentosFallidosOTP += 1;
+          const restantes = MAX_INTENTOS_OTP - intentosFallidosOTP;
+          if (intentosFallidosOTP >= MAX_INTENTOS_OTP) {
+            alert("Has superado el límite de 5 intentos fallidos. Por seguridad la sesión se cancelará.");
+            location.reload();
+          } else {
+            otpErrorMsg.textContent = `Código OTP incorrecto. Le quedan ${restantes} intento(s).`;
+            inputOtp.value = '';
+            inputOtp.focus();
+          }
+        }
+      }
+    }
+
+    inputOtp.addEventListener('input', () => {
+      inputOtp.value = inputOtp.value.replace(/\D/g, '');
+      if (inputOtp.value.length === 6) {
+        verificarYEjecutarOtp();
+      }
+    });
+
+    btnConfirmarOtpManual.addEventListener('click', (e) => {
+      e.stopPropagation();
+      verificarYEjecutarOtp();
+    });
+
+    btnarCancelarOtp = document.getElementById('btnarCancelarOtp');
+    if (btnarCancelarOtp) {
+      btnarCancelarOtp.addEventListener('click', () => { modalOtp.style.display = 'none'; });
+    }
+    btnCancelarOtp.addEventListener('click', () => { modalOtp.style.display = 'none'; });
 
     function renderizarEstampaPKCS7() {
       const contenedor = document.getElementById('wrapperActive');
@@ -1446,14 +1518,14 @@
       renderizarEstampaPKCS7();
     }
 
-    let isвищаring = false;
+    let isDraggingMarker = false;
     let isResizingMarker = false;
     let startResizeX = 0;
     let startResizeW = 200;
 
     markerFirma.addEventListener('mousedown', (e) => {
       if (e.target === resizeHandle) return;
-      isвищаring = true;
+      isDraggingMarker = true;
       e.stopPropagation();
     });
 
@@ -1465,7 +1537,7 @@
     });
 
     window.addEventListener('mousemove', (e) => {
-      if (isвищаring) {
+      if (isDraggingMarker) {
         const rect = canvasActive.getBoundingClientRect();
         let x = e.clientX - rect.left;
         let y = e.clientY - rect.top;
@@ -1485,7 +1557,7 @@
     });
 
     window.addEventListener('mouseup', () => {
-      isвищаring = false;
+      isDraggingMarker = false;
       isResizingMarker = false;
     });
 
@@ -1540,17 +1612,6 @@
         alert("Error en el servidor al procesar la firma.");
       }
     }
-
-    btnConfirmarOtpManual.addEventListener('click', () => {
-      modalOtp.style.display = 'none';
-      ejecutarProcesoFirmaBackend("123456");
-    });
-    btnConfirmSignatureModal.addEventListener('click', () => {
-      if (!haCompletadoTrazo) return;
-      modalSignaturePad.style.display = 'none';
-      modalOtp.style.display = 'flex';
-      inputOtp.focus();
-    });
 
     btnDescargar.addEventListener('click', () => {
       if (descargaUrlActual) window.open(descargaUrlActual, '_blank');
