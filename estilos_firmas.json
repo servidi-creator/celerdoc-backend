@@ -1,24 +1,36 @@
 {
-    "estilo_bloque_principal": {
-        "capas": {
-            "zona_trazo": {
-                "alto_contenedor": 40
-            },
-            "nombres_apellidos": {
-                "negrita": true,
-                "tamano_fuente": 10,
-                "color": "#111827",
-                "interlineado": 12
-            },
-            "identificacion": {
-                "negrita": false,
-                "tamano_fuente": 9,
-                "color": "#4B5563"
-            },
-            "codigo_verificacion": {
-                "tamano_fuente": 7,
-                "color": "#6B7280"
-            }
+  "estilo_bloque_principal": {
+    "dimensiones_base": {
+      "ancho": 200,
+      "alto": 80,
+      "redimensionable": true,
+      "escalado_proporcional": true
+    },
+    "capas": {
+      "zona_trazo": {
+        "alto_contenedor": 40,
+        "modalidades_permitidas": ["trazo_manual", "imagen_archivo"],
+        "ajuste_imagen": {
+          "mantener_proporcion": true,
+          "centrado": true,
+          "formatos_admitidos": ["PNG", "JPG", "JPEG", "WEBP", "SVG"]
         }
+      },
+      "nombres_apellidos": {
+        "negrita": true,
+        "tamano_fuente": 8,
+        "color": "#111827",
+        "interlineado": 10
+      },
+      "identificacion": {
+        "negrita": false,
+        "tamano_fuente": 8,
+        "color": "#4B5563"
+      },
+      "codigo_verificacion": {
+        "tamano_fuente": 4.0,
+        "color": "#4B5563"
+      }
     }
+  }
 }

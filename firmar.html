@@ -223,9 +223,10 @@
     .canvas-page-wrapper canvas { display: block; }
     .page-label-badge { position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.75); color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; z-index: 5; pointer-events: none; }
 
+    /* GRUPO FLOTANTE CON REDIMENSIONAMIENTO PROPORCIONAL */
     #floatingSignGroup {
       position: absolute;
-      width: 210px;
+      width: 200px;
       transform: translate(-50%, -50%);
       display: none;
       flex-direction: column;
@@ -238,7 +239,7 @@
 
     #markerFirma {
       width: 100%;
-      height: 74px;
+      height: 80px;
       border: 1.5px dashed #3366CC;
       background-color: rgba(51, 102, 204, 0.16);
       border-radius: 6px;
@@ -250,8 +251,27 @@
       padding: 6px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.12);
       backdrop-filter: blur(1px);
+      position: relative;
     }
     #markerFirma:active { cursor: grabbing; }
+
+    /* TIRADOR DE REDIMENSIONAMIENTO */
+    .resize-handle {
+      position: absolute;
+      right: 2px;
+      bottom: 2px;
+      width: 14px;
+      height: 14px;
+      cursor: se-resize;
+      background: #3366CC;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 8px;
+      touch-action: none;
+    }
 
     .marker-security-text {
       font-size: 7.5px;
@@ -319,6 +339,7 @@
       transform: translateX(-50%);
     }
 
+    /* MODAL DE FIRMA DUAL: TRAZO O IMAGEN */
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
@@ -326,17 +347,84 @@
     }
     .modal-card {
       background: var(--bg-card); border: 1px solid var(--brand-primary); border-radius: 12px;
-      padding: 24px; width: 100%; max-width: 550px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      padding: 24px; width: 100%; max-width: 580px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.25);
     }
     .modal-card h3 { margin: 0 0 8px 0; color: var(--brand-primary); font-size: 19px; font-weight: 600; }
-    .modal-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
     
+    .tab-bar-firma {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 8px;
+    }
+    .tab-btn {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-input);
+      color: var(--text-main);
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .tab-btn.active {
+      background: var(--brand-primary);
+      color: #ffffff;
+      border-color: var(--brand-primary);
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
     .signature-pad-container {
-      width: 100%; height: 200px; background: #ffffff; border: 2px dashed var(--border-input);
-      border-radius: 8px; position: relative; margin-bottom: 20px; cursor: crosshair; touch-action: none;
+      width: 100%; height: 210px; background: #ffffff; border: 2px dashed var(--border-input);
+      border-radius: 8px; position: relative; margin-bottom: 14px; cursor: crosshair; touch-action: none;
+      overflow: hidden;
     }
     #canvasFullscreenPad { width: 100%; height: 100%; display: block; border-radius: 6px; }
     .pad-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; color: #94a3b8; pointer-events: none; font-weight: 400; }
+
+    /* CONTENEDOR DE EDICIÓN DE IMAGEN */
+    .image-pad-container {
+      width: 100%;
+      height: 210px;
+      background: #ffffff;
+      border: 2px dashed var(--border-input);
+      border-radius: 8px;
+      position: relative;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: move;
+      touch-action: none;
+    }
+    #imgFirmaPreview {
+      max-width: 80%;
+      max-height: 80%;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+    .image-controls-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      color: var(--text-label);
+      font-weight: 500;
+    }
+    .image-controls-bar input[type="range"] {
+      width: 180px;
+      accent-color: var(--brand-primary);
+      cursor: pointer;
+    }
 
     .modal-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
     .btn-secondary { background: #64748b; color: #ffffff; border: none; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
@@ -388,7 +476,7 @@
     </div>
 
     <h1 id="txtTitulo">Celerdoc — Firmar Documento</h1>
-    <p class="desc" id="txtDesc">Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo para generar el documento certificado.</p>
+    <p class="desc" id="txtDesc">Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo o inserte su firma para generar el documento certificado.</p>
 
     <div class="form-grid">
       <div class="form-group">
@@ -431,13 +519,11 @@
       </div>
     </div>
 
-    <!-- CASILLA DE TÉRMINOS CON SCROLL Y RESALTO UX -->
     <div class="terms-wrap" id="wrapTerms">
       <input type="checkbox" id="chkTerms">
       <label for="chkTerms" id="lblTerms">Acepto los Términos, Condiciones y Política de Privacidad de Celerdoc.</label>
     </div>
 
-    <!-- BOTÓN / ZONA DE CARGA UX -->
     <div class="dropzone-container" id="dropArea" onclick="document.getElementById('fileInput').click()">
       <div class="dropzone-action-btn">
         <span>📂</span>
@@ -485,11 +571,11 @@
           <div class="page-label-badge" id="badgeActive">Activa / Documento Original</div>
           <canvas id="canvasEspejo"></canvas>
           
-          <!-- MARCADOR FLOTANTE LIBRE (TOUCH + MOUSE) -->
           <div id="floatingSignGroup">
             <div id="markerFirma">
               <span class="marker-security-text">CelerDoc: security value code</span>
               <span class="marker-watermark">🖐️ Mueve aquí con dedo o cursor</span>
+              <div class="resize-handle" id="resizeHandle" title="Arrastra para redimensionar el recuadro">↘</div>
             </div>
             <button type="button" class="btn-floating-sign" id="btnFloatingSign">
               <span>✍️ Firmar</span>
@@ -500,18 +586,43 @@
       </div>
     </div>
 
+    <!-- MODAL DUAL: TRAZO MANUAL O SUBIR IMAGEN -->
     <div class="modal-overlay" id="modalSignaturePad">
       <div class="modal-card">
-        <h3>Realice su Firma</h3>
-        <p>Dibuje su trazo con el dedo o el cursor dentro del recuadro.</p>
+        <h3>Realice o Inserte su Firma</h3>
         
-        <div class="signature-pad-container" id="padContainer">
-          <canvas id="canvasFullscreenPad"></canvas>
-          <span class="pad-placeholder" id="fullscreenPadPlaceholder">Trace aquí su firma</span>
+        <div class="tab-bar-firma">
+          <button type="button" class="tab-btn active" id="tabBtnDibujar">✍️ Dibujar Trazo</button>
+          <button type="button" class="tab-btn" id="tabBtnImagen">🖼️ Cargar Imagen</button>
+        </div>
+
+        <!-- Pestaña 1: Trazo Manual -->
+        <div class="tab-content active" id="tabContentDibujo">
+          <div class="signature-pad-container" id="padContainer">
+            <canvas id="canvasFullscreenPad"></canvas>
+            <span class="pad-placeholder" id="fullscreenPadPlaceholder">Trace aquí su firma</span>
+          </div>
+        </div>
+
+        <!-- Pestaña 2: Imagen de Firma -->
+        <div class="tab-content" id="tabContentImagen">
+          <div class="image-pad-container" id="imagePadContainer">
+            <img id="imgFirmaPreview" alt="Firma subida" style="display:none;">
+            <span class="pad-placeholder" id="imgPlaceholder" onclick="document.getElementById('inputImgFirma').click()" style="cursor:pointer;">
+              📂 Clic aquí para seleccionar archivo de imagen (PNG / JPG / WEBP)
+            </span>
+          </div>
+          <input type="file" id="inputImgFirma" accept="image/png, image/jpeg, image/webp, image/svg+xml">
+          
+          <div class="image-controls-bar" id="imgControlsBar" style="display:none;">
+            <span>Tamaño:</span>
+            <input type="range" id="rangeImgScale" min="30" max="150" value="80">
+            <button type="button" class="btn-control" id="btnCambiarImg">Reemplazar imagen</button>
+          </div>
         </div>
 
         <div class="modal-buttons">
-          <button type="button" class="btn-secondary" id="btnClearFullscreenSignature">Borrar / Modificar</button>
+          <button type="button" class="btn-secondary" id="btnClearFullscreenSignature">Borrar / Limpiar</button>
           <button type="button" class="btn-secondary" id="btnCancelSignatureModal">Cancelar</button>
           <button type="button" class="btn-action-modal" id="btnConfirmSignatureModal">Firmar y Continuar</button>
         </div>
@@ -549,7 +660,6 @@
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // Detección automática del servidor (usa el servidor local si se prueba en localhost)
     const API_URL = (window.location.protocol.startsWith('http')) ? window.location.origin : "https://celerdoc.onrender.com";
     const CODIGO_OTP_SIMULADO = "123456";
     const MAX_INTENTOS_OTP = 5;
@@ -604,7 +714,7 @@
     const textosIdiomas = {
       es: {
         titulo: "Celerdoc — Firmar Documento",
-        desc: "Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo para generar el documento certificado.",
+        desc: "Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo o inserte su firma para generar el documento certificado.",
         lblTipoDoc: "Tipo de Documento *",
         lblNombreTitular: "Nombre Completo *",
         lblNumDoc: "Nº de Documento *",
@@ -641,7 +751,7 @@
       },
       en: {
         titulo: "Celerdoc — Sign Document",
-        desc: "Upload original document, place signature point, fill required fields and draw your signature to generate certified document.",
+        desc: "Upload original document, place signature point, fill required fields and draw or insert your signature to generate certified document.",
         lblTipoDoc: "Document Type *",
         lblNombreTitular: "Full Signer Name *",
         lblNumDoc: "Document Number *",
@@ -978,18 +1088,81 @@
 
     const floatingSignGroup = document.getElementById('floatingSignGroup');
     const markerFirma = document.getElementById('markerFirma');
+    const resizeHandle = document.getElementById('resizeHandle');
     const btnFloatingSign = document.getElementById('btnFloatingSign');
     
     const modalSignaturePad = document.getElementById('modalSignaturePad');
+    const tabBtnDibujar = document.getElementById('tabBtnDibujar');
+    const tabBtnImagen = document.getElementById('tabBtnImagen');
+    const tabContentDibujo = document.getElementById('tabContentDibujo');
+    const tabContentImagen = document.getElementById('tabContentImagen');
+
     const padContainer = document.getElementById('padContainer');
     const canvasFullscreenPad = document.getElementById('canvasFullscreenPad');
     const ctxFullscreenPad = canvasFullscreenPad.getContext('2d');
     const fullscreenPadPlaceholder = document.getElementById('fullscreenPadPlaceholder');
+    
+    const inputImgFirma = document.getElementById('inputImgFirma');
+    const imgFirmaPreview = document.getElementById('imgFirmaPreview');
+    const imgPlaceholder = document.getElementById('imgPlaceholder');
+    const imgControlsBar = document.getElementById('imgControlsBar');
+    const rangeImgScale = document.getElementById('rangeImgScale');
+    const btnCambiarImg = document.getElementById('btnCambiarImg');
+
     const btnClearFullscreenSignature = document.getElementById('btnClearFullscreenSignature');
     const btnCancelSignatureModal = document.getElementById('btnCancelSignatureModal');
     const btnConfirmSignatureModal = document.getElementById('btnConfirmSignatureModal');
+    
     let isDrawingFullscreen = false;
     let haCompletadoTrazo = false;
+    let modalidadFirmaActiva = 'trazo'; // 'trazo' | 'imagen'
+    let imagenFirmaCargadaBase64 = '';
+
+    // GESTIÓN DE PESTAÑAS (TRAZO / IMAGEN)
+    tabBtnDibujar.addEventListener('click', () => {
+      modalidadFirmaActiva = 'trazo';
+      tabBtnDibujar.classList.add('active');
+      tabBtnImagen.classList.remove('active');
+      tabContentDibujo.classList.add('active');
+      tabContentImagen.classList.remove('active');
+      setTimeout(ajustarTamanoCanvasFullscreen, 50);
+    });
+
+    tabBtnImagen.addEventListener('click', () => {
+      modalidadFirmaActiva = 'imagen';
+      tabBtnImagen.classList.add('active');
+      tabBtnDibujar.classList.remove('active');
+      tabContentImagen.classList.add('active');
+      tabContentDibujo.classList.remove('active');
+    });
+
+    // CARGA Y ESCALADO PROPORCIONAL DE IMAGEN
+    inputImgFirma.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          imagenFirmaCargadaBase64 = event.target.result;
+          imgFirmaPreview.src = imagenFirmaCargadaBase64;
+          imgFirmaPreview.style.display = 'block';
+          imgPlaceholder.style.display = 'none';
+          imgControlsBar.style.display = 'flex';
+          rangeImgScale.value = 80;
+          imgFirmaPreview.style.transform = `scale(0.8)`;
+          haCompletadoTrazo = true;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    rangeImgScale.addEventListener('input', () => {
+      const escala = rangeImgScale.value / 100;
+      imgFirmaPreview.style.transform = `scale(${escala})`;
+    });
+
+    btnCambiarImg.addEventListener('click', () => {
+      inputImgFirma.click();
+    });
 
     const modalOtp = document.getElementById('modalOtp');
     const inputOtp = document.getElementById('inputOtp');
@@ -1063,10 +1236,20 @@
 
     btnClearFullscreenSignature.addEventListener('click', (e) => {
       e.stopPropagation();
-      ctxFullscreenPad.clearRect(0, 0, canvasFullscreenPad.width, canvasFullscreenPad.height);
-      fullscreenPadPlaceholder.style.display = 'block';
-      haCompletadoTrazo = false;
-      datosTrazabilidad.trazo_firma_png = '';
+      if (modalidadFirmaActiva === 'trazo') {
+        ctxFullscreenPad.clearRect(0, 0, canvasFullscreenPad.width, canvasFullscreenPad.height);
+        fullscreenPadPlaceholder.style.display = 'block';
+        haCompletadoTrazo = false;
+        datosTrazabilidad.trazo_firma_png = '';
+      } else {
+        imgFirmaPreview.src = '';
+        imgFirmaPreview.style.display = 'none';
+        imgPlaceholder.style.display = 'block';
+        imgControlsBar.style.display = 'none';
+        inputImgFirma.value = '';
+        imagenFirmaCargadaBase64 = '';
+        haCompletadoTrazo = false;
+      }
     });
 
     btnCancelSignatureModal.addEventListener('click', (e) => {
@@ -1077,9 +1260,32 @@
     btnConfirmSignatureModal.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!haCompletadoTrazo) {
-        alert("Por favor realice su trazo de firma antes de continuar.");
+        alert("Por favor realice su trazo o cargue una imagen de su firma antes de continuar.");
         return;
       }
+
+      if (modalidadFirmaActiva === 'imagen') {
+        // Renderizar imagen escalada proporcionalmente a un canvas transparente
+        const canvasTemp = document.createElement('canvas');
+        canvasTemp.width = 400;
+        canvasTemp.height = 160;
+        const ctxTemp = canvasTemp.getContext('2d');
+        const escala = rangeImgScale.value / 100;
+
+        const imgObj = new Image();
+        imgObj.onload = () => {
+          const ratio = Math.min((canvasTemp.width * escala) / imgObj.width, (canvasTemp.height * escala) / imgObj.height);
+          const dw = imgObj.width * ratio;
+          const dh = imgObj.height * ratio;
+          const dx = (canvasTemp.width - dw) / 2;
+          const dy = (canvasTemp.height - dh) / 2;
+          ctxTemp.drawImage(imgObj, dx, dy, dw, dh);
+          datosTrazabilidad.trazo_firma_png = canvasTemp.toDataURL('image/png');
+          timestampTrazoFirmaUtc = new Date().toISOString();
+        };
+        imgObj.src = imagenFirmaCargadaBase64;
+      }
+
       modalSignaturePad.style.display = 'none';
       
       const tel = inputPhone.value.trim();
@@ -1195,7 +1401,6 @@
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       datosTrazabilidad.sha256_original = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // Generar hash PKCS#7 único para este documento
       const uniqueHash = generarHashUnicoTransaccion();
       datosTrazabilidad.pkcs7_aplicado.hash = uniqueHash;
       datosTrazabilidad.pkcs7_aplicado.qr_data = `${API_URL}/validar?sig=${uniqueHash.substring(0, 32)}`;
@@ -1377,39 +1582,73 @@
       renderizarEstampaPKCS7();
     }
 
-    // MANIPULACIÓN FLOTANTE TOUCH (DEDO) Y CURSOR (MOUSE)
+    // MANIPULACIÓN Y REDIMENSIONAMIENTO DEL MARCADOR FLOTANTE
     let isDraggingMarker = false;
+    let isResizingMarker = false;
+    let startResizeX = 0;
+    let startResizeW = 200;
 
     markerFirma.addEventListener('mousedown', (e) => {
+      if (e.target === resizeHandle) return;
       isDraggingMarker = true;
       e.stopPropagation();
     });
 
     markerFirma.addEventListener('touchstart', (e) => {
+      if (e.target === resizeHandle) return;
       isDraggingMarker = true;
       e.stopPropagation();
     }, { passive: true });
 
+    resizeHandle.addEventListener('mousedown', (e) => {
+      isResizingMarker = true;
+      startResizeX = e.clientX;
+      startResizeW = floatingSignGroup.offsetWidth;
+      e.stopPropagation();
+    });
+
+    resizeHandle.addEventListener('touchstart', (e) => {
+      isResizingMarker = true;
+      startResizeX = e.touches[0].clientX;
+      startResizeW = floatingSignGroup.offsetWidth;
+      e.stopPropagation();
+    }, { passive: true });
+
     window.addEventListener('mousemove', (e) => {
-      if (!isDraggingMarker) return;
-      actualizarPosicionMarcador(e.clientX, e.clientY);
+      if (isDraggingMarker) {
+        actualizarPosicionMarcador(e.clientX, e.clientY);
+      } else if (isResizingMarker) {
+        const diffX = e.clientX - startResizeX;
+        const newW = Math.max(140, Math.min(320, startResizeW + diffX));
+        const newH = Math.round(newW * 0.4); // Proporción 200:80 = 2.5:1
+        floatingSignGroup.style.width = `${newW}px`;
+        markerFirma.style.height = `${newH}px`;
+      }
     });
 
     window.addEventListener('touchmove', (e) => {
-      if (!isDraggingMarker) return;
-      const touch = e.touches[0];
-      actualizarPosicionMarcador(touch.clientX, touch.clientY);
+      if (isDraggingMarker) {
+        actualizarPosicionMarcador(e.touches[0].clientX, e.touches[0].clientY);
+      } else if (isResizingMarker) {
+        const diffX = e.touches[0].clientX - startResizeX;
+        const newW = Math.max(140, Math.min(320, startResizeW + diffX));
+        const newH = Math.round(newW * 0.4);
+        floatingSignGroup.style.width = `${newW}px`;
+        markerFirma.style.height = `${newH}px`;
+      }
     }, { passive: true });
 
     window.addEventListener('mouseup', () => { 
-      if (isDraggingMarker) {
+      if (isDraggingMarker || isResizingMarker) {
         isDraggingMarker = false;
+        isResizingMarker = false;
         renderizarEstampaPKCS7();
       }
     });
     window.addEventListener('touchend', () => { 
-      if (isDraggingMarker) {
+      if (isDraggingMarker || isResizingMarker) {
         isDraggingMarker = false;
+        isResizingMarker = false;
         renderizarEstampaPKCS7();
       }
     });
