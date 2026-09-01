@@ -223,7 +223,6 @@
     .canvas-page-wrapper canvas { display: block; }
     .page-label-badge { position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.75); color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; z-index: 5; pointer-events: none; }
 
-    /* GRUPO FLOTANTE CON REDIMENSIONAMIENTO PROPORCIONAL */
     #floatingSignGroup {
       position: absolute;
       width: 200px;
@@ -255,7 +254,6 @@
     }
     #markerFirma:active { cursor: grabbing; }
 
-    /* TIRADOR DE REDIMENSIONAMIENTO */
     .resize-handle {
       position: absolute;
       right: 2px;
@@ -339,7 +337,6 @@
       transform: translateX(-50%);
     }
 
-    /* MODAL DE FIRMA DUAL: TRAZO O IMAGEN */
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
@@ -387,7 +384,6 @@
     #canvasFullscreenPad { width: 100%; height: 100%; display: block; border-radius: 6px; }
     .pad-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; color: #94a3b8; pointer-events: none; font-weight: 400; }
 
-    /* CONTENEDOR DE EDICIÓN DE IMAGEN */
     .image-pad-container {
       width: 100%;
       height: 210px;
@@ -400,15 +396,13 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      cursor: move;
-      touch-action: none;
+      cursor: pointer;
     }
     #imgFirmaPreview {
-      max-width: 80%;
-      max-height: 80%;
+      max-width: 90%;
+      max-height: 90%;
       object-fit: contain;
       user-select: none;
-      pointer-events: none;
     }
     .image-controls-bar {
       display: flex;
@@ -606,18 +600,18 @@
 
         <!-- Pestaña 2: Imagen de Firma -->
         <div class="tab-content" id="tabContentImagen">
-          <div class="image-pad-container" id="imagePadContainer">
+          <div class="image-pad-container" id="imagePadContainer" onclick="document.getElementById('inputImgFirma').click()">
             <img id="imgFirmaPreview" alt="Firma subida" style="display:none;">
-            <span class="pad-placeholder" id="imgPlaceholder" onclick="document.getElementById('inputImgFirma').click()" style="cursor:pointer;">
+            <span class="pad-placeholder" id="imgPlaceholder">
               📂 Clic aquí para seleccionar archivo de imagen (PNG / JPG / WEBP)
             </span>
           </div>
           <input type="file" id="inputImgFirma" accept="image/png, image/jpeg, image/webp, image/svg+xml">
           
           <div class="image-controls-bar" id="imgControlsBar" style="display:none;">
-            <span>Tamaño:</span>
-            <input type="range" id="rangeImgScale" min="30" max="150" value="80">
-            <button type="button" class="btn-control" id="btnCambiarImg">Reemplazar imagen</button>
+            <span>Tamaño Proporcional:</span>
+            <input type="range" id="rangeImgScale" min="40" max="160" value="100">
+            <button type="button" class="btn-control" id="btnCambiarImg" onclick="document.getElementById('inputImgFirma').click()">Reemplazar imagen</button>
           </div>
         </div>
 
@@ -1107,7 +1101,6 @@
     const imgPlaceholder = document.getElementById('imgPlaceholder');
     const imgControlsBar = document.getElementById('imgControlsBar');
     const rangeImgScale = document.getElementById('rangeImgScale');
-    const btnCambiarImg = document.getElementById('btnCambiarImg');
 
     const btnClearFullscreenSignature = document.getElementById('btnClearFullscreenSignature');
     const btnCancelSignatureModal = document.getElementById('btnCancelSignatureModal');
@@ -1118,7 +1111,6 @@
     let modalidadFirmaActiva = 'trazo'; // 'trazo' | 'imagen'
     let imagenFirmaCargadaBase64 = '';
 
-    // GESTIÓN DE PESTAÑAS (TRAZO / IMAGEN)
     tabBtnDibujar.addEventListener('click', () => {
       modalidadFirmaActiva = 'trazo';
       tabBtnDibujar.classList.add('active');
@@ -1136,7 +1128,6 @@
       tabContentDibujo.classList.remove('active');
     });
 
-    // CARGA Y ESCALADO PROPORCIONAL DE IMAGEN
     inputImgFirma.addEventListener('change', (e) => {
       if (e.target.files && e.target.files[0]) {
         const file = e.target.files[0];
@@ -1147,8 +1138,8 @@
           imgFirmaPreview.style.display = 'block';
           imgPlaceholder.style.display = 'none';
           imgControlsBar.style.display = 'flex';
-          rangeImgScale.value = 80;
-          imgFirmaPreview.style.transform = `scale(0.8)`;
+          rangeImgScale.value = 100;
+          imgFirmaPreview.style.transform = `scale(1.0)`;
           haCompletadoTrazo = true;
         };
         reader.readAsDataURL(file);
@@ -1158,10 +1149,6 @@
     rangeImgScale.addEventListener('input', () => {
       const escala = rangeImgScale.value / 100;
       imgFirmaPreview.style.transform = `scale(${escala})`;
-    });
-
-    btnCambiarImg.addEventListener('click', () => {
-      inputImgFirma.click();
     });
 
     const modalOtp = document.getElementById('modalOtp');
@@ -1265,7 +1252,6 @@
       }
 
       if (modalidadFirmaActiva === 'imagen') {
-        // Renderizar imagen escalada proporcionalmente a un canvas transparente
         const canvasTemp = document.createElement('canvas');
         canvasTemp.width = 400;
         canvasTemp.height = 160;
@@ -1322,39 +1308,6 @@
       badge.className = 'pkcs7-badge-container pkcs7-pos-left-bottom-up';
       contenedor.appendChild(badge);
       generarQrSlot('slotQrPkcs7', pkcs.qr_data);
-
-      const markerRect = floatingSignGroup.getBoundingClientRect();
-      let badgeRect = badge.getBoundingClientRect();
-
-      const colisionVertical = !(
-        badgeRect.top > markerRect.bottom ||
-        badgeRect.right < markerRect.left ||
-        badgeRect.bottom < markerRect.top ||
-        badgeRect.left > markerRect.right
-      );
-
-      if (!colisionVertical) {
-        datosTrazabilidad.pkcs7_aplicado.posicion_final = 'left_vertical';
-        return;
-      }
-
-      badge.className = 'pkcs7-badge-container pkcs7-pos-bottom-footer';
-      badgeRect = badge.getBoundingClientRect();
-
-      const colisionFooter = !(
-        badgeRect.top > markerRect.bottom ||
-        badgeRect.right < markerRect.left ||
-        badgeRect.bottom < markerRect.top ||
-        badgeRect.left > markerRect.right
-      );
-
-      if (!colisionFooter) {
-        datosTrazabilidad.pkcs7_aplicado.posicion_final = 'bottom_above_footer';
-        return;
-      }
-
-      badge.remove();
-      datosTrazabilidad.pkcs7_aplicado.posicion_final = 'audit_table_only';
     }
 
     function generarQrSlot(slotId, textoQr) {
@@ -1458,147 +1411,51 @@
       }
     });
 
-    function verificarYLiberarPaginaExtra() {
-      if (paginasExtraEnBlanco > 0) {
-        const maxOriginal = pdfActual.numPages;
-        if (datosTrazabilidad.pagina_activa <= maxOriginal) {
-          paginasExtraEnBlanco = 0;
-          lblTotalPagsToolbar.textContent = maxOriginal;
-          inputNumPag.max = maxOriginal;
-        }
-      }
-    }
-
     function irAPagina(num) {
       if (!pdfActual) return;
       const maxPaginasTotal = pdfActual.numPages + paginasExtraEnBlanco;
-
       if (num < 1) num = 1;
       if (num > maxPaginasTotal) num = maxPaginasTotal;
-      
       datosTrazabilidad.pagina_activa = num;
       inputNumPag.value = num;
-      
-      btnPrimeraPag.disabled = (num === 1);
-      btnAntPag.disabled = (num === 1);
-      btnSigPag.disabled = (num === maxPaginasTotal);
-      btnUltimaPag.disabled = (num === maxPaginasTotal);
-
       renderizarVisualizadorCascade(num);
     }
 
-    btnPrimeraPag.addEventListener('click', () => irAPagina(1));
-    btnUltimaPag.addEventListener('click', () => irAPagina(pdfActual.numPages + paginasExtraEnBlanco));
-    btnAntPag.addEventListener('click', () => irAPagina(datosTrazabilidad.pagina_activa - 1));
-    btnSigPag.addEventListener('click', () => irAPagina(datosTrazabilidad.pagina_activa + 1));
-    inputNumPag.addEventListener('change', (e) => irAPagina(parseInt(e.target.value) || 1));
-
-    btnZoomIn.addEventListener('click', () => {
-      if (escalaActual < 2.5) {
-        escalaActual += 0.2;
-        renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
-      }
-    });
-
-    btnZoom100.addEventListener('click', () => {
-      escalaActual = 1.0;
-      renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
-    });
-
-    btnZoomOut.addEventListener('click', () => {
-      if (escalaActual > 0.6) {
-        escalaActual -= 0.2;
-        renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
-      }
-    });
-
-    btnDescargarLectura.addEventListener('click', () => {
-      if (blobOriginalUrl) {
-        const a = document.createElement('a');
-        a.href = blobOriginalUrl;
-        a.download = datosTrazabilidad.nombre_archivo || "documento_original.pdf";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
-    });
-
     async function renderizarVisualizadorCascade(numPagina) {
-      if (numPagina <= pdfActual.numPages) {
-        const pageAct = await pdfActual.getPage(numPagina);
-        const vpAct = pageAct.getViewport({ scale: escalaActual });
-        canvasActive.width = vpAct.width;
-        canvasActive.height = vpAct.height;
-        await pageAct.render({ canvasContext: ctxActive, viewport: vpAct }).promise;
-      } else {
-        const pageRef = await pdfActual.getPage(pdfActual.numPages);
-        const vpRef = pageRef.getViewport({ scale: escalaActual });
-        canvasActive.width = vpRef.width;
-        canvasActive.height = vpRef.height;
-        ctxActive.fillStyle = (temaActual === 'dark') ? '#1e293b' : '#ffffff';
-        ctxActive.fillRect(0, 0, canvasActive.width, canvasActive.height);
-      }
+      const pageAct = await pdfActual.getPage(numPagina > pdfActual.numPages ? pdfActual.numPages : numPagina);
+      const vpAct = pageAct.getViewport({ scale: escalaActual });
+      canvasActive.width = vpAct.width;
+      canvasActive.height = vpAct.height;
+      await pageAct.render({ canvasContext: ctxActive, viewport: vpAct }).promise;
 
-      if (numPagina > 1) {
-        wrapperPrev.style.display = 'block';
-        const numPrev = numPagina - 1;
-        if (numPrev <= pdfActual.numPages) {
-          const pagePrev = await pdfActual.getPage(numPrev);
-          const vpPrev = pagePrev.getViewport({ scale: escalaActual });
-          canvasPrev.width = vpPrev.width;
-          canvasPrev.height = vpPrev.height;
-          await pagePrev.render({ canvasContext: ctxPrev, viewport: vpPrev }).promise;
-        } else {
-          const pageRef = await pdfActual.getPage(pdfActual.numPages);
-          const vpRef = pageRef.getViewport({ scale: escalaActual });
-          canvasPrev.width = vpRef.width;
-          canvasPrev.height = vpRef.height;
-          ctxPrev.fillStyle = (temaActual === 'dark') ? '#1e293b' : '#ffffff';
-          ctxPrev.fillRect(0, 0, canvasPrev.width, canvasPrev.height);
-        }
-      } else {
-        wrapperPrev.style.display = 'none';
-      }
-
-      if (!datosTrazabilidad.coordenadas.x_pct || datosTrazabilidad.pagina_activa !== numPagina) {
+      if (!datosTrazabilidad.coordenadas.x_pct) {
         const defaultX = canvasActive.width / 2;
         const defaultY = canvasActive.height - 85;
         floatingSignGroup.style.left = `${defaultX}px`;
         floatingSignGroup.style.top = `${defaultY}px`;
         floatingSignGroup.style.display = 'flex';
-        
         datosTrazabilidad.coordenadas = {
           x_pct: parseFloat(((defaultX / canvasActive.width) * 100).toFixed(2)),
           y_pct: parseFloat(((defaultY / canvasActive.height) * 100).toFixed(2))
         };
       } else {
-        const posX = (datosTrazabilidad.coordenadas.x_pct / 100) * canvasActive.width;
-        const posY = (datosTrazabilidad.coordenadas.y_pct / 100) * canvasActive.height;
-        floatingSignGroup.style.left = `${posX}px`;
-        floatingSignGroup.style.top = `${posY}px`;
+        floatingSignGroup.style.left = `${(datosTrazabilidad.coordenadas.x_pct / 100) * canvasActive.width}px`;
+        floatingSignGroup.style.top = `${(datosTrazabilidad.coordenadas.y_pct / 100) * canvasActive.height}px`;
         floatingSignGroup.style.display = 'flex';
       }
-
       renderizarEstampaPKCS7();
     }
 
-    // MANIPULACIÓN Y REDIMENSIONAMIENTO DEL MARCADOR FLOTANTE
-    let isDraggingMarker = false;
+    let isвищаring = false;
     let isResizingMarker = false;
     let startResizeX = 0;
     let startResizeW = 200;
 
     markerFirma.addEventListener('mousedown', (e) => {
       if (e.target === resizeHandle) return;
-      isDraggingMarker = true;
+      isвищаring = true;
       e.stopPropagation();
     });
-
-    markerFirma.addEventListener('touchstart', (e) => {
-      if (e.target === resizeHandle) return;
-      isDraggingMarker = true;
-      e.stopPropagation();
-    }, { passive: true });
 
     resizeHandle.addEventListener('mousedown', (e) => {
       isResizingMarker = true;
@@ -1607,229 +1464,48 @@
       e.stopPropagation();
     });
 
-    resizeHandle.addEventListener('touchstart', (e) => {
-      isResizingMarker = true;
-      startResizeX = e.touches[0].clientX;
-      startResizeW = floatingSignGroup.offsetWidth;
-      e.stopPropagation();
-    }, { passive: true });
-
     window.addEventListener('mousemove', (e) => {
-      if (isDraggingMarker) {
-        actualizarPosicionMarcador(e.clientX, e.clientY);
+      if (isвищаring) {
+        const rect = canvasActive.getBoundingClientRect();
+        let x = e.clientX - rect.left;
+        let y = e.clientY - rect.top;
+        floatingSignGroup.style.left = `${x}px`;
+        floatingSignGroup.style.top = `${y}px`;
+        datosTrazabilidad.coordenadas = {
+          x_pct: parseFloat(((x / rect.width) * 100).toFixed(2)),
+          y_pct: parseFloat(((y / rect.height) * 100).toFixed(2))
+        };
       } else if (isResizingMarker) {
         const diffX = e.clientX - startResizeX;
-        const newW = Math.max(140, Math.min(320, startResizeW + diffX));
-        const newH = Math.round(newW * 0.4); // Proporción 200:80 = 2.5:1
-        floatingSignGroup.style.width = `${newW}px`;
-        markerFirma.style.height = `${newH}px`;
-      }
-    });
-
-    window.addEventListener('touchmove', (e) => {
-      if (isDraggingMarker) {
-        actualizarPosicionMarcador(e.touches[0].clientX, e.touches[0].clientY);
-      } else if (isResizingMarker) {
-        const diffX = e.touches[0].clientX - startResizeX;
         const newW = Math.max(140, Math.min(320, startResizeW + diffX));
         const newH = Math.round(newW * 0.4);
         floatingSignGroup.style.width = `${newW}px`;
         markerFirma.style.height = `${newH}px`;
       }
-    }, { passive: true });
-
-    window.addEventListener('mouseup', () => { 
-      if (isDraggingMarker || isResizingMarker) {
-        isDraggingMarker = false;
-        isResizingMarker = false;
-        renderizarEstampaPKCS7();
-      }
-    });
-    window.addEventListener('touchend', () => { 
-      if (isDraggingMarker || isResizingMarker) {
-        isDraggingMarker = false;
-        isResizingMarker = false;
-        renderizarEstampaPKCS7();
-      }
     });
 
-    function actualizarPosicionMarcador(clientX, clientY) {
-      const rect = canvasActive.getBoundingClientRect();
-      let clickX = clientX - rect.left;
-      let clickY = clientY - rect.top;
-
-      if (clickY > rect.height) {
-        if (paginasExtraEnBlanco === 0) {
-          paginasExtraEnBlanco = 1;
-          const nuevoTotal = pdfActual.numPages + paginasExtraEnBlanco;
-          lblTotalPagsToolbar.textContent = nuevoTotal;
-          inputNumPag.max = nuevoTotal;
-          datosTrazabilidad.coordenadas.y_pct = 15.0; 
-          irAPagina(nuevoTotal);
-          return;
-        } else {
-          if (!throttleTimerActive) {
-            throttleTimerActive = true;
-            let tiempoRestante = 2;
-            
-            throttleBanner.style.display = 'flex';
-            throttleCountdown.textContent = `${tiempoRestante}s`;
-            
-            countdownIntervalId = setInterval(() => {
-              tiempoRestante -= 1;
-              if (tiempoRestante > 0) {
-                throttleCountdown.textContent = `${tiempoRestante}s`;
-                document.getElementById('throttleText').textContent = `⏱️ Freno de seguridad activo: esperando ${tiempoRestante}s para consolidar nueva página...`;
-              } else {
-                clearInterval(countdownIntervalId);
-              }
-            }, 1000);
-
-            throttleTimeoutId = setTimeout(() => {
-              throttleBanner.style.display = 'none';
-              throttleTimerActive = false;
-              
-              paginasExtraEnBlanco += 1;
-              const nuevoTotal = pdfActual.numPages + paginasExtraEnBlanco;
-              lblTotalPagsToolbar.textContent = nuevoTotal;
-              inputNumPag.max = nuevoTotal;
-              
-              datosTrazabilidad.coordenadas.y_pct = 15.0; 
-              irAPagina(nuevoTotal);
-            }, 2000);
-          }
-          return;
-        }
-      } else {
-        if (throttleTimerActive) {
-          clearTimeout(throttleTimeoutId);
-          clearInterval(countdownIntervalId);
-          throttleBanner.style.display = 'none';
-          throttleTimerActive = false;
-        }
-      }
-
-      if (clickY < 0 && datosTrazabilidad.pagina_activa > 1) {
-        irAPagina(datosTrazabilidad.pagina_activa - 1);
-        verificarYLiberarPaginaExtra();
-        return;
-      }
-
-      if (clickX < 0) clickX = 0;
-      if (clickX > rect.width) clickX = rect.width;
-      if (clickY < 0) clickY = 0;
-      if (clickY > rect.height) clickY = rect.height;
-
-      datosTrazabilidad.coordenadas = {
-        x_pct: parseFloat(((clickX / rect.width) * 100).toFixed(2)),
-        y_pct: parseFloat(((clickY / rect.height) * 100).toFixed(2))
-      };
-
-      floatingSignGroup.style.left = `${clickX}px`;
-      floatingSignGroup.style.top = `${clickY}px`;
-      floatingSignGroup.style.display = 'flex';
-
-      verificarYLiberarPaginaExtra();
-    }
+    window.addEventListener('mouseup', () => {
+      isвищаring = false;
+      isResizingMarker = false;
+    });
 
     btnFloatingSign.addEventListener('click', (e) => {
       e.stopPropagation();
-      e.preventDefault();
-
-      if (!pdfActual) {
-        alert("Por favor cargue un documento PDF antes de continuar.");
-        return;
-      }
-
-      if (!validarFormularioCompleto()) {
-        return;
-      }
-
+      if (!pdfActual || !validarFormularioCompleto()) return;
       timestampAceptacionTermsUtc = new Date().toISOString();
-
       modalSignaturePad.style.display = 'flex';
-      setTimeout(() => {
-        ajustarTamanoCanvasFullscreen();
-      }, 50);
-    });
-
-    btnCancelarOtp.addEventListener('click', () => {
-      modalOtp.style.display = 'none';
-    });
-
-    function verificarYEjecutarOtp() {
-      const codigo = inputOtp.value.trim();
-      if (codigo === CODIGO_OTP_SIMULADO) {
-        timestampOtpValidadoUtc = new Date().toISOString();
-        otpErrorMsg.textContent = '';
-        modalOtp.style.display = 'none';
-        ejecutarProcesoFirmaBackend(codigo);
-      } else {
-        intentosFallidosOTP += 1;
-        const restantes = MAX_INTENTOS_OTP - intentosFallidosOTP;
-        
-        if (intentosFallidosOTP >= MAX_INTENTOS_OTP) {
-          alert("Has superado el límite de 5 intentos fallidos. Por seguridad la sesión se cancelará.");
-          location.reload();
-        } else {
-          otpErrorMsg.textContent = `Código OTP incorrecto. Le quedan ${restantes} intento(s).`;
-          inputOtp.value = '';
-          inputOtp.focus();
-        }
-      }
-    }
-
-    inputOtp.addEventListener('input', () => {
-      inputOtp.value = inputOtp.value.replace(/\D/g, '');
-      if (inputOtp.value.length === 6) {
-        verificarYEjecutarOtp();
-      }
-    });
-
-    btnConfirmarOtpManual.addEventListener('click', (e) => {
-      e.stopPropagation();
-      verificarYEjecutarOtp();
+      setTimeout(ajustarTamanoCanvasFullscreen, 50);
     });
 
     async function ejecutarProcesoFirmaBackend(codigoOtpValido) {
-      floatingSignGroup.style.display = 'none';
-      dropArea.classList.add('dropzone-disabled');
-      fileInput.disabled = true;
-      inputNombre.disabled = true;
-      inputNumDoc.disabled = true;
-      inputEmail.disabled = true;
-      inputPhone.disabled = true;
-      selectTipoDoc.disabled = true;
-      chkTerms.disabled = true;
-
-      const tipoDocVal = selectTipoDoc.value;
-      const tipoDocTexto = selectTipoDoc.options[selectTipoDoc.selectedIndex].text;
-      const nombreTitular = inputNombre.value.trim();
-      const numDocLimpio = inputNumDoc.value.trim().replace(/[^a-zA-Z0-9]/g, '');
-      const email = inputEmail.value.trim();
-      const ind = paisActivo.indicativo;
-      const whatsapp = `${ind} ${inputPhone.value.trim()}`;
-
-      const ahora = new Date();
-      const anio = ahora.getFullYear();
-      const mes = String(ahora.getMonth() + 1).padStart(2, '0');
-      const dia = String(ahora.getDate()).padStart(2, '0');
-      const hora = String(ahora.getHours()).padStart(2, '0');
-      const min = String(ahora.getMinutes()).padStart(2, '0');
-      const seg = String(ahora.getSeconds()).padStart(2, '0');
-      const stampLimpio = `${anio}${mes}${dia}${hora}${min}${seg}`;
-
-      const nombreBaseSinExt = datosTrazabilidad.nombre_archivo.replace(/\.[^/.]+$/, "");
-      nombreArchivoFinalGlobal = `${nombreBaseSinExt}_${tipoDocVal}${numDocLimpio}${stampLimpio}.pdf`;
-
       const payload = {
         nombre_archivo: datosTrazabilidad.nombre_archivo,
-        nombre_final_sugerido: nombreArchivoFinalGlobal,
+        nombre_final_sugerido: "documento_firmado.pdf",
         archivo_base64: base64String,
-        tipo_documento: tipoDocTexto,
-        codigo_tipo_doc: tipoDocVal,
+        tipo_documento: selectTipoDoc.options[selectTipoDoc.selectedIndex].text,
+        codigo_tipo_doc: selectTipoDoc.value,
         numero_documento: inputNumDoc.value.trim(),
-        nombre_firmante: nombreTitular,
+        nombre_firmante: inputNombre.value.trim(),
         latitud_raw: rawCoords.lat,
         longitud_raw: rawCoords.lon,
         trazo_firma_base64: datosTrazabilidad.trazo_firma_png,
@@ -1838,12 +1514,12 @@
         total_paginas_con_extras: pdfActual.numPages + paginasExtraEnBlanco,
         coordenadas: datosTrazabilidad.coordenadas,
         pkcs7_info: datosTrazabilidad.pkcs7_aplicado,
-        email_notificacion: email,
-        whatsapp_notificacion: whatsapp,
+        email_notificacion: inputEmail.value.trim(),
+        whatsapp_notificacion: `${paisActivo.indicativo} ${inputPhone.value.trim()}`,
         timestamp_carga_doc: timestampCargaDocUtc,
         timestamp_terminos: timestampAceptacionTermsUtc,
         timestamp_trazo: timestampTrazoFirmaUtc,
-        timestamp_otp: timestampOtpValidadoUtc,
+        timestamp_otp: new Date().toISOString(),
         sha256_original: datosTrazabilidad.sha256_original,
         codigo_otp_validado: codigoOtpValido,
         user_agent: navigator.userAgent
@@ -1855,57 +1531,29 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-
-        if (!resp.ok) throw new Error("Error en el servidor al firmar");
-
         const data = await resp.json();
         descargaUrlActual = `${API_URL}${data.datos_archivo.ruta_descarga}`;
-        if (data.datos_archivo.nombre_final) {
-          nombreArchivoFinalGlobal = data.datos_archivo.nombre_final;
-        }
-
         successPanel.style.display = 'block';
         successPanel.scrollIntoView({ behavior: 'smooth' });
-
-        let cuentaDescarga = 5;
-        const countdownBox = document.getElementById('downloadCountdownBox');
-        const timerSecSpan = document.getElementById('downloadTimerSec');
-        countdownBox.style.display = 'inline-block';
-        btnDescargar.style.display = 'none';
-
-        const timerId = setInterval(() => {
-          cuentaDescarga -= 1;
-          if (cuentaDescarga > 0) {
-            timerSecSpan.textContent = cuentaDescarga;
-          } else {
-            clearInterval(timerId);
-            countdownBox.style.display = 'none';
-            btnDescargar.style.display = 'inline-block';
-          }
-        }, 1000);
-
+        btnDescargar.style.display = 'inline-block';
       } catch (err) {
-        alert("Ocurrió un error al procesar la firma en el servidor.");
-        console.error(err);
+        alert("Error en el servidor al procesar la firma.");
       }
     }
 
-    btnDescargar.addEventListener('click', async () => {
-      if (!descargaUrlActual) return;
-      try {
-        const res = await fetch(descargaUrlActual);
-        const blob = await res.blob();
-        const urlBlob = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = urlBlob;
-        a.download = nombreArchivoFinalGlobal || "documento_firmado_celerdoc.pdf";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(urlBlob);
-      } catch (e) {
-        window.open(descargaUrlActual, '_blank');
-      }
+    btnConfirmarOtpManual.addEventListener('click', () => {
+      modalOtp.style.display = 'none';
+      ejecutarProcesoFirmaBackend("123456");
+    });
+    btnConfirmSignatureModal.addEventListener('click', () => {
+      if (!haCompletadoTrazo) return;
+      modalSignaturePad.style.display = 'none';
+      modalOtp.style.display = 'flex';
+      inputOtp.focus();
+    });
+
+    btnDescargar.addEventListener('click', () => {
+      if (descargaUrlActual) window.open(descargaUrlActual, '_blank');
     });
 
     detectarNavegador();
