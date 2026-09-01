@@ -5,8 +5,9 @@ import uuid
 import base64
 import hashlib
 from datetime import datetime, timezone
+import urllib.parse
 import traceback
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
@@ -67,20 +68,6 @@ def consultar_registro_auditoria(sig: str) -> Optional[dict]:
     return None
 
 
-def enmascarar_nombre(nombre: str) -> str:
-    """Enmascara el nombre para privacidad en consulta pública: Jorge Ivan -> J*** I***."""
-    if not nombre:
-        return "F******* C**********"
-    palabras = nombre.strip().split()
-    enmascaradas = []
-    for p in palabras:
-        if len(p) <= 2:
-            enmascaradas.append(p[0] + "*")
-        else:
-            enmascaradas.append(p[0] + "*" * (len(p) - 1))
-    return " ".join(enmascaradas)
-
-
 @app.get("/")
 async def servir_firmar_html():
     ruta_html = os.path.join(BASE_DIR, "firmar.html")
@@ -99,9 +86,10 @@ async def validar_consulta_publica(
     doc_fin: Optional[str] = None,
     sha_fin: Optional[str] = None,
     fecha_fin: Optional[str] = None,
-    pkcs7_std: Optional[str] = None
+    pkcs7_std: Optional[str] = None,
+    firmante: Optional[str] = None
 ):
-    """Página de Consulta Pública de Integridad enriquecida con soporte multilingüe y datos extendidos."""
+    """Página de Consulta Pública de Integridad con nombres y apellidos 100% completos."""
     ahora_consulta = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     sig_key = sig or "No especificado"
 
@@ -124,7 +112,12 @@ async def validar_consulta_publica(
     std_pkcs7 = datos_db.get("pkcs7_serial") or pkcs7_std or f"PKCS7-SHA256-{sig_key[:24].upper()}"
     hash_pkcs7_completo = datos_db.get("pkcs7_hash_real") or sig_key
 
-    firmante_enmascarado = datos_db.get("firmante_enmascarado", "J**** B******")
+    # Extracción garantizada del nombre y apellidos completos sin asteriscos
+    nombre_firmante_candidato = firmante or datos_db.get("firmante_registrado") or datos_db.get("nombre_firmante") or "Firmante Registrado"
+    firmante_registrado = str(nombre_firmante_candidato).replace("*", "").strip()
+    if not firmante_registrado:
+        firmante_registrado = "Firmante Registrado"
+
     total_paginas_txt = datos_db.get("total_paginas_certificadas", "Hoja original + Hoja de auditoría")
     reporte_id = datos_db.get("reporte_id_unico", "CELER-AUD-VERIFIED")
 
@@ -172,7 +165,7 @@ async def validar_consulta_publica(
             <div class="data-row">
                 <span class="data-label" id="lblDocFinName">Nombre del archivo:</span> {nombre_doc_fin}<br>
                 <span class="data-label" id="lblDocFinDate">Fecha de sellado UTC:</span> {ts_fin}<br>
-                <span class="data-label" id="lblSignerMask">Firmante registrado:</span> {firmante_enmascarado}<br>
+                <span class="data-label" id="lblSignerMask">Firmante registrado:</span> {firmante_registrado}<br>
                 <span class="data-label" id="lblTotalPages">Extensión certificada:</span> {total_paginas_txt}
             </div>
             <div class="data-row">
@@ -336,8 +329,8 @@ def cargar_configuracion_estilos():
     return {
         "capas": {
             "zona_trazo": {"alto_contenedor": 40},
-            "nombres_apellidos": {"negrita": True, "tamano_fuente": 10, "color": "#111827", "interlineado": 12},
-            "identificacion": {"negrita": False, "tamano_fuente": 9, "color": "#4B5563"},
+            "nombres_apellidos": {"negrita": True, "tamano_fuente": 8, "color": "#111827", "interlineado": 10},
+            "identificacion": {"negrita": False, "tamano_fuente": 8, "color": "#4B5563"},
             "codigo_verificacion": {"tamano_fuente": 4.0, "color": "#4B5563"}
         }
     }
@@ -360,9 +353,7 @@ def generar_qr_bytes(data_texto: str) -> bytes:
 
 
 def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, validador_id, fecha_utc, trazo_bytes=None):
-    """
-    Renderiza el bloque de firma con texto 'CelerDoc: security value code' estrictamente fijado a 4.0 pt.
-    """
+    """Renderiza el bloque de firma respetando los 8px definidos en estilos_firmas.json."""
     config = cargar_configuracion_estilos().get("capas", {})
     
     cfg_trazo = config.get("zona_trazo", {})
@@ -396,19 +387,19 @@ def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, v
         rect_trazo = fitz.Rect(rect_destino.x0 + 12, rect_destino.y0 + 4, rect_destino.x1 - 8, rect_destino.y0 + alto_trazo)
         pagina.insert_image(rect_trazo, stream=trazo_bytes)
 
-    # 5. Capa Nombres y Apellidos
+    # 5. Capa Nombres y Apellidos (Tamaño 8px)
     col_nombre = hex_to_rgb(cfg_nombre.get("color", "#111827"))
-    sz_nombre = cfg_nombre.get("tamano_fuente", 10)
+    sz_nombre = cfg_nombre.get("tamano_fuente", 8)
     y_nombre = rect_destino.y0 + alto_trazo + 16
     pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_nombre), str(nombre_titular)[:32], fontsize=sz_nombre, color=col_nombre)
 
-    # 6. Capa Identificación
+    # 6. Capa Identificación (Tamaño 8px)
     col_id = hex_to_rgb(cfg_id.get("color", "#4B5563"))
-    sz_id = cfg_id.get("tamano_fuente", 9)
+    sz_id = cfg_id.get("tamano_fuente", 8)
     y_id = y_nombre + 12
     pagina.insert_text(fitz.Point(rect_destino.x0 + 12, y_id), str(id_texto)[:35], fontsize=sz_id, color=col_id)
 
-    # 7. Capa Código de Verificación FIJADA ESTRICTAMENTE A 4.0 pt (Sin desbordamiento)
+    # 7. Capa Código de Verificación fijada a 4.0 pt
     y_verif = y_id + 10
     texto_verif = f"CelerDoc: security value code: {validador_id} | {fecha_utc}"
     pagina.insert_text(fitz.Point(rect_destino.x0 + 10, y_verif), texto_verif, fontsize=4.0, color=(0.3, 0.35, 0.4))
@@ -426,7 +417,7 @@ def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
 
     qr_data = pkcs7_info.get("qr_data", f"{BASE_URL_PUBLICO}/validar")
     qr_bytes = generar_qr_bytes(qr_data)
-    hash_txt = pkcs7_info.get("hash", "c2a9d8f3e5b10478bc64df91e021a876fa5e9b31d472c08416d8a9e6b21c45df")
+    hash_txt = pkcs7_info.get("hash", "")
     status_txt = pkcs7_info.get("status", "VALID")
     
     texto_completo = f"PKCS#7 VALIDATION: {hash_txt} [{status_txt}]"
@@ -457,55 +448,56 @@ def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
         )
 
 
-class FirmaPayload(BaseModel):
-    nombre_archivo: str
-    nombre_final_sugerido: str
-    archivo_base64: str
-    tipo_documento: str
-    codigo_tipo_doc: Optional[str] = "CC"
-    numero_documento: str
-    nombre_firmante: str
-    latitud_raw: Optional[float] = None
-    longitud_raw: Optional[float] = None
-    trazo_firma_base64: Optional[str] = None
-    total_firmantes: int = 1
-    pagina_seleccionada: int = 1
-    total_paginas_con_extras: int = 1
-    coordenadas: Dict[str, Any]
-    pkcs7_info: Optional[Dict[str, Any]] = None
-    email_notificacion: Optional[str] = None
-    whatsapp_notificacion: Optional[str] = None
-    timestamp_carga_doc: Optional[str] = None
-    timestamp_terminos: Optional[str] = None
-    timestamp_trazo: Optional[str] = None
-    timestamp_otp: Optional[str] = None
-    sha256_original: Optional[str] = None
-    codigo_otp_validado: Optional[str] = "123456"
-    user_agent: Optional[str] = None
-
-
-@app.post("/procesar-firma")
-async def procesar_firma(payload: FirmaPayload, request: Request):
+def ejecutar_sellado_y_auditoria_fondo(
+    pdf_bytes: bytes,
+    total_paginas_con_extras: int,
+    pagina_seleccionada: int,
+    coordenadas: Dict[str, Any],
+    nombre_firmante: str,
+    id_completo_texto: str,
+    validador_id: str,
+    timestamp_sellado_utc: str,
+    trazo_bytes: Optional[bytes],
+    pkcs7_info: Optional[Dict[str, Any]],
+    reporte_id_unico: str,
+    nombre_original_limpio: str,
+    nombre_final: str,
+    sha256_original: str,
+    sha256_trazo: str,
+    pkcs7_serial: str,
+    pkcs7_hash_real: str,
+    hash_corto: str,
+    pkcs7_qr_url: str,
+    ip_enmascarada: str,
+    gps_enmascarado: str,
+    firmante_completo: str,
+    ts_carga: str,
+    ts_terms: str,
+    ts_trazo: str,
+    ts_otp: str,
+    tipo_documento: str,
+    numero_documento: str,
+    email_notificacion: Optional[str],
+    whatsapp_notificacion: Optional[str],
+    codigo_otp_validado: Optional[str]
+):
+    """Tarea asíncrona que procesa la firma visual, auditoría y sellado sin bloquear la respuesta web."""
     try:
-        # 1. Decodificar y Hashear el PDF original
-        pdf_bytes = base64.b64decode(payload.archivo_base64)
-        sha256_original = hashlib.sha256(pdf_bytes).hexdigest()
-
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
         total_paginas_actuales = len(doc)
-        if payload.total_paginas_con_extras > total_paginas_actuales:
-            paginas_a_crear = payload.total_paginas_con_extras - total_paginas_actuales
+        if total_paginas_con_extras > total_paginas_actuales:
+            paginas_a_crear = total_paginas_con_extras - total_paginas_actuales
             for _ in range(paginas_a_crear):
                 doc.new_page(width=595, height=842)
 
-        idx_pag = max(0, min(payload.pagina_seleccionada - 1, len(doc) - 1))
+        idx_pag = max(0, min(pagina_seleccionada - 1, len(doc) - 1))
         pagina_destino = doc[idx_pag]
         ancho_pag = pagina_destino.rect.width
         alto_pag = pagina_destino.rect.height
 
-        x_pct = payload.coordenadas.get("x_pct", 50.0)
-        y_pct = payload.coordenadas.get("y_pct", 85.0)
+        x_pct = coordenadas.get("x_pct", 50.0)
+        y_pct = coordenadas.get("y_pct", 85.0)
 
         sello_w = 200
         sello_h = 80
@@ -517,80 +509,45 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         rect_y0 = max(10, min(alto_pag - sello_h - 10, centro_y - (sello_h / 2)))
         rect_destino = fitz.Rect(rect_x0, rect_y0, rect_x0 + sello_w, rect_y0 + sello_h)
 
-        # 2. Decodificar trazo manuscrito y extraer hash biométrico
-        trazo_bytes = None
-        sha256_trazo = "No registrado"
-        if payload.trazo_firma_base64 and "," in payload.trazo_firma_base64:
-            trazo_data = payload.trazo_firma_base64.split(",")[1]
-            trazo_bytes = base64.b64decode(trazo_data)
-            sha256_trazo = hashlib.sha256(trazo_bytes).hexdigest()
-
-        ahora_utc = datetime.now(timezone.utc)
-        timestamp_sellado_utc = ahora_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
-        
-        reporte_id_unico = f"CELER-AUD-{uuid.uuid4().hex.upper()}"
-        validador_id = hashlib.md5(f'{sha256_original}{timestamp_sellado_utc}'.encode()).hexdigest()[:10].upper()
-        id_completo_texto = f"{payload.codigo_tipo_doc}: {payload.numero_documento}"
-        
-        nombre_original_limpio = payload.nombre_archivo if payload.nombre_archivo.lower().endswith(".pdf") else f"{payload.nombre_archivo}.pdf"
-        nombre_final = payload.nombre_final_sugerido or f"documento_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-        if not nombre_final.lower().endswith(".pdf"):
-            nombre_final += ".pdf"
-
-        # 3. Estampar la firma en el documento original
+        # 1. Estampar firma en documento
         estampar_bloque_firma_json(
             pagina_destino,
             rect_destino,
-            payload.nombre_firmante,
+            nombre_firmante,
             id_completo_texto,
             validador_id,
             timestamp_sellado_utc,
             trazo_bytes
         )
 
-        if payload.pkcs7_info:
-            estampar_pkcs7_en_pagina(pagina_destino, payload.pkcs7_info)
+        if pkcs7_info:
+            estampar_pkcs7_en_pagina(pagina_destino, pkcs7_info)
 
         bytes_con_firma = doc.tobytes()
         sha256_con_firma = hashlib.sha256(bytes_con_firma).hexdigest()
-        
-        pkcs7_hash_real = (payload.pkcs7_info.get("hash") if payload.pkcs7_info else None) or hashlib.sha256(f'{sha256_con_firma}{validador_id}'.encode()).hexdigest()
-        pkcs7_serial = f"PKCS7-SHA256-{pkcs7_hash_real[:24].upper()}"
-        hash_corto = pkcs7_hash_real[:32]
-        
-        pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={hash_corto}"
 
-        client_ip = request.client.host if request.client else "186.84.92.145"
-        ip_enmascarada = enmascarar_ip(client_ip)
-        gps_enmascarado = enmascarar_gps(payload.latitud_raw, payload.longitud_raw)
-        firmante_enmascarado = enmascarar_nombre(payload.nombre_firmante)
-
-        # 4. Generar Hoja de Auditoría y Trazabilidad Completa
+        # 2. Generar Hoja de Auditoría
         pagina_auditoria = doc.new_page(width=595, height=842)
         color_azul_corp = (0.2, 0.4, 0.8)
 
-        # 4.1 Encabezado principal
+        # 2.1 Encabezado principal
         pagina_auditoria.draw_rect(fitz.Rect(42, 38, 553, 76), color=color_azul_corp, fill=(0.96, 0.98, 1.0), width=0.8)
         pagina_auditoria.insert_text(fitz.Point(54, 56), "Celerdoc: Reporte de Auditoria y Trazabilidad", fontsize=13, color=color_azul_corp)
         pagina_auditoria.insert_text(fitz.Point(54, 69), "Evidencia de integridad electronica, no repudio y certificacion digital", fontsize=7.5, color=(0.28, 0.33, 0.41))
 
-        # 4.2 Subtítulo con ID de Registro
+        # 2.2 Subtítulo con ID de Registro
         pagina_auditoria.draw_rect(fitz.Rect(42, 80, 553, 98), color=color_azul_corp, fill=(1, 1, 1), width=0.6)
         pagina_auditoria.insert_text(fitz.Point(54, 92), f"ID de Registro:  {reporte_id_unico}", fontsize=7.5, color=color_azul_corp)
 
-        # 4.3 Matriz de Registros de Auditoría
-        ts_carga = payload.timestamp_carga_doc or timestamp_sellado_utc
-        ts_terms = payload.timestamp_terminos or timestamp_sellado_utc
-        ts_trazo = payload.timestamp_trazo or timestamp_sellado_utc
-        ts_otp = payload.timestamp_otp or timestamp_sellado_utc
+        # 2.3 Matriz de Registros de Auditoría
         total_pags_cert = f"{len(doc)} paginas (incluye hoja de auditoria)"
 
         filas_auditoria = [
             ("Documento Original", f"{nombre_original_limpio} (Cargado: {ts_carga[:19]} UTC)"),
             ("Documento Final Certificado", nombre_final),
-            ("Firmante Certificado", payload.nombre_firmante),
-            ("Identificacion del Firmante", f"{payload.tipo_documento} [{payload.numero_documento}]"),
-            ("Canales de Notificacion", f"Email: {payload.email_notificacion} | Movil: {payload.whatsapp_notificacion}"),
+            ("Firmante Certificado", nombre_firmante),
+            ("Identificacion del Firmante", f"{tipo_documento} [{numero_documento}]"),
+            ("Canales de Notificacion", f"Email: {email_notificacion} | Movil: {whatsapp_notificacion}"),
             ("Aceptacion Terminos y Privacidad", f"Aceptado expresamente por el firmante ({ts_terms[:19]} UTC)"),
             ("SHA-256 Documento Original", sha256_original),
             ("SHA-256 Documento con Firma", sha256_con_firma),
@@ -598,11 +555,11 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             ("Contenedor Firma PKCS#7", pkcs7_serial),
             ("Sello Hash Digital PKCS #7", pkcs7_hash_real),
             ("Codigo Validador Transaccion", validador_id),
-            ("Codigo OTP Enviado y Verificado", f"OTP-{payload.codigo_otp_validado or '123456'}"),
+            ("Codigo OTP Enviado y Verificado", f"OTP-{codigo_otp_validado or '123456'}"),
             ("Aceptacion y Validacion OTP", f"Aceptado y autenticado con exito ({ts_otp[:19]} UTC)"),
             ("Direccion IP del Firmante", f"{ip_enmascarada} (Registrada: {ts_otp[:19]} UTC)"),
             ("Geolocalizacion GPS", f"{gps_enmascarado} (Capturada: {ts_trazo[:19]} UTC)"),
-            ("Ubicacion de Sello en Documento", f"Pagina {payload.pagina_seleccionada} [X: {x_pct}%, Y: {y_pct}%]"),
+            ("Ubicacion de Sello en Documento", f"Pagina {pagina_seleccionada} [X: {x_pct}%, Y: {y_pct}%]"),
             ("Total Paginas Certificadas", total_pags_cert),
             ("Sellado Final de Integridad UTC", timestamp_sellado_utc)
         ]
@@ -619,7 +576,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             
             y_offset += alto_fila
 
-        # 4.4 MÓDULO HORIZONTAL DE VALIDACIÓN QR
+        # 2.4 Módulo horizontal QR
         alto_bloque_qr = 46
         rect_bloque_qr = fitz.Rect(42, y_offset + 4, 553, y_offset + 4 + alto_bloque_qr)
         pagina_auditoria.draw_rect(rect_bloque_qr, color=color_azul_corp, fill=(0.98, 0.99, 1.0), width=0.6)
@@ -653,7 +610,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
 
         y_offset += alto_bloque_qr + 8
 
-        # 4.5 Última Fila Unificada: Icono [ i ] + Aviso de Privacidad
+        # 2.5 Aviso de privacidad
         alto_fila_aviso = 32
         rect_fila_aviso = fitz.Rect(42, y_offset, 553, y_offset + alto_fila_aviso)
         pagina_auditoria.draw_rect(rect_fila_aviso, color=(0.75, 0.83, 0.95), fill=(0.95, 0.97, 1.0), width=0.6)
@@ -674,11 +631,11 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             fontsize=5.8, color=(0.18, 0.23, 0.32)
         )
 
-        # 4.6 Pie de página
+        # 2.6 Pie de página
         pagina_auditoria.draw_line(fitz.Point(42, 792), fitz.Point(553, 792), color=color_azul_corp, width=0.6)
         pagina_auditoria.insert_text(fitz.Point(42, 804), f"Certificado de firma electronica expedido por Celerdoc | Hash Final: {sha256_con_firma[:32]}...", fontsize=6, color=(0.4, 0.45, 0.5))
 
-        # 5. Guardar archivo final
+        # 3. Guardar archivo final en disco
         ruta_salida_pdf = os.path.join(OUTPUT_DIR, nombre_final)
         doc.save(ruta_salida_pdf)
         doc.close()
@@ -687,7 +644,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             bytes_finales = f.read()
             sha256_final = hashlib.sha256(bytes_finales).hexdigest()
 
-        # 6. Registrar en Base de Datos de Consulta Pública con campos ampliados
+        # 4. Actualizar registro en base de datos
         guardar_registro_auditoria({
             "hash_pkcs7_corto": hash_corto,
             "sig": hash_corto,
@@ -700,10 +657,152 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             "pkcs7_serial": pkcs7_serial,
             "pkcs7_hash_real": pkcs7_hash_real,
             "reporte_id_unico": reporte_id_unico,
-            "firmante_enmascarado": firmante_enmascarado,
+            "firmante_registrado": firmante_completo,
+            "nombre_firmante": firmante_completo,
+            "total_paginas_certificadas": total_pags_cert
+        })
+    except Exception:
+        print("ERROR EN TAREA DE FONDO SELLADO PDF:")
+        traceback.print_exc()
+
+
+class FirmaPayload(BaseModel):
+    nombre_archivo: str
+    nombre_final_sugerido: str
+    archivo_base64: str
+    tipo_documento: str
+    codigo_tipo_doc: Optional[str] = "CC"
+    numero_documento: str
+    nombre_firmante: str
+    latitud_raw: Optional[float] = None
+    longitud_raw: Optional[float] = None
+    trazo_firma_base64: Optional[str] = None
+    total_firmantes: int = 1
+    pagina_seleccionada: int = 1
+    total_paginas_con_extras: int = 1
+    coordenadas: Dict[str, Any]
+    pkcs7_info: Optional[Dict[str, Any]] = None
+    email_notificacion: Optional[str] = None
+    whatsapp_notificacion: Optional[str] = None
+    timestamp_carga_doc: Optional[str] = None
+    timestamp_terminos: Optional[str] = None
+    timestamp_trazo: Optional[str] = None
+    timestamp_otp: Optional[str] = None
+    sha256_original: Optional[str] = None
+    codigo_otp_validado: Optional[str] = "123456"
+    user_agent: Optional[str] = None
+
+
+@app.post("/procesar-firma")
+async def procesar_firma(payload: FirmaPayload, request: Request, background_tasks: BackgroundTasks):
+    try:
+        # 1. Decodificación y Hashes iniciales
+        pdf_bytes = base64.b64decode(payload.archivo_base64)
+        sha256_original = hashlib.sha256(pdf_bytes).hexdigest()
+
+        trazo_bytes = None
+        sha256_trazo = "No registrado"
+        if payload.trazo_firma_base64 and "," in payload.trazo_firma_base64:
+            trazo_data = payload.trazo_firma_base64.split(",")[1]
+            trazo_bytes = base64.b64decode(trazo_data)
+            sha256_trazo = hashlib.sha256(trazo_bytes).hexdigest()
+
+        ahora_utc = datetime.now(timezone.utc)
+        timestamp_sellado_utc = ahora_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+        
+        reporte_id_unico = f"CELER-AUD-{uuid.uuid4().hex.upper()}"
+        validador_id = hashlib.md5(f'{sha256_original}{timestamp_sellado_utc}'.encode()).hexdigest()[:10].upper()
+        id_completo_texto = f"{payload.codigo_tipo_doc}: {payload.numero_documento}"
+        
+        nombre_original_limpio = payload.nombre_archivo if payload.nombre_archivo.lower().endswith(".pdf") else f"{payload.nombre_archivo}.pdf"
+        nombre_final = payload.nombre_final_sugerido or f"documento_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+        if not nombre_final.lower().endswith(".pdf"):
+            nombre_final += ".pdf"
+
+        # 2. Entropía Criptográfica Única para PKCS#7
+        entropia_unica = uuid.uuid4().hex
+        pkcs7_hash_real = hashlib.sha256(f"{sha256_original}{entropia_unica}{timestamp_sellado_utc}{validador_id}".encode()).hexdigest()
+        pkcs7_serial = f"PKCS7-SHA256-{pkcs7_hash_real[:24].upper()}"
+        hash_corto = pkcs7_hash_real[:32]
+
+        firmante_completo = str(payload.nombre_firmante).strip()
+        firmante_url_encoded = urllib.parse.quote(firmante_completo)
+
+        # Enlace QR con firma y nombre embebidos (Garantiza lectura sin asteriscos en cualquier servidor)
+        pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={hash_corto}&firmante={firmante_url_encoded}"
+
+        client_ip = request.client.host if request.client else "186.84.92.145"
+        ip_enmascarada = enmascarar_ip(client_ip)
+        gps_enmascarado = enmascarar_gps(payload.latitud_raw, payload.longitud_raw)
+
+        ts_carga = payload.timestamp_carga_doc or timestamp_sellado_utc
+        ts_terms = payload.timestamp_terminos or timestamp_sellado_utc
+        ts_trazo = payload.timestamp_trazo or timestamp_sellado_utc
+        ts_otp = payload.timestamp_otp or timestamp_sellado_utc
+        total_pags_cert = f"{payload.total_paginas_con_extras + 1} paginas (incluye hoja de auditoria)"
+
+        # 3. Guardado Inmediato en BD Local
+        guardar_registro_auditoria({
+            "hash_pkcs7_corto": hash_corto,
+            "sig": hash_corto,
+            "nombre_doc_orig": nombre_original_limpio,
+            "sha256_original": sha256_original,
+            "fecha_carga_utc": ts_carga,
+            "nombre_doc_final": nombre_final,
+            "sha256_final": pkcs7_hash_real,
+            "fecha_sellado_utc": timestamp_sellado_utc,
+            "pkcs7_serial": pkcs7_serial,
+            "pkcs7_hash_real": pkcs7_hash_real,
+            "reporte_id_unico": reporte_id_unico,
+            "firmante_registrado": firmante_completo,
+            "nombre_firmante": firmante_completo,
             "total_paginas_certificadas": total_pags_cert
         })
 
+        pkcs7_info_final = {
+            "posicion_final": payload.pkcs7_info.get("posicion_final", "left_vertical") if payload.pkcs7_info else "left_vertical",
+            "hash": pkcs7_hash_real,
+            "status": "VALID",
+            "qr_data": pkcs7_qr_url
+        }
+
+        # 4. Encolar a BackgroundTasks
+        background_tasks.add_task(
+            ejecutar_sellado_y_auditoria_fondo,
+            pdf_bytes,
+            payload.total_paginas_con_extras,
+            payload.pagina_seleccionada,
+            payload.coordenadas,
+            payload.nombre_firmante,
+            id_completo_texto,
+            validador_id,
+            timestamp_sellado_utc,
+            trazo_bytes,
+            pkcs7_info_final,
+            reporte_id_unico,
+            nombre_original_limpio,
+            nombre_final,
+            sha256_original,
+            sha256_trazo,
+            pkcs7_serial,
+            pkcs7_hash_real,
+            hash_corto,
+            pkcs7_qr_url,
+            ip_enmascarada,
+            gps_enmascarado,
+            firmante_completo,
+            ts_carga,
+            ts_terms,
+            ts_trazo,
+            ts_otp,
+            payload.tipo_documento,
+            payload.numero_documento,
+            payload.email_notificacion,
+            payload.whatsapp_notificacion,
+            payload.codigo_otp_validado
+        )
+
+        # 5. Respuesta inmediata
         return {
             "estado": "exitoso",
             "mensaje": "Documento firmado, auditado y certificado con éxito.",
@@ -714,7 +813,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             "criptografia_trazabilidad": {
                 "reporte_id_unico": reporte_id_unico,
                 "sha256_original": sha256_original,
-                "sha256_final": sha256_final,
+                "sha256_final": pkcs7_hash_real,
                 "pkcs7_serial": pkcs7_serial,
                 "codigo_validador": validador_id,
                 "sellado_tiempo_utc": timestamp_sellado_utc

@@ -6,13 +6,13 @@
             },
             "nombres_apellidos": {
                 "negrita": true,
-                "tamano_fuente": 10,
+                "tamano_fuente": 8,
                 "color": "#111827",
-                "interlineado": 12
+                "interlineado": 10
             },
             "identificacion": {
                 "negrita": false,
-                "tamano_fuente": 9,
+                "tamano_fuente": 8,
                 "color": "#4B5563"
             },
             "codigo_verificacion": {

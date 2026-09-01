@@ -1,6 +1,23 @@
 {
-    "bloque_firma": {
-        "ancho": 200,
-        "alto": 100
+  "configuracion_general": {
+    "plataforma": "Celerdoc",
+    "version_estandar": "PKCS#7 / SHA-256",
+    "politicas_privacidad": {
+      "enmascarar_firmante": false,
+      "mostrar_nombre_completo": true,
+      "enmascarar_ip": true,
+      "enmascarar_gps": true
+    },
+    "sello_criptografico": {
+      "algoritmo_hash": "SHA-256",
+      "contenedor": "PKCS#7",
+      "entropia_unica_transaccion": true,
+      "longitud_sello_hex": 64
+    },
+    "codigo_qr": {
+      "incluir_enlace_validacion": true,
+      "tamano_modulo": 3,
+      "nivel_correccion": "M"
     }
+  }
 }

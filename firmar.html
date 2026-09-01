@@ -104,7 +104,6 @@
     .phone-prefix { background: var(--bg-subtle); padding: 0 10px; font-size: 13px; font-weight: 600; color: var(--brand-primary); border-right: 1px solid var(--border-input); height: 100%; display: flex; align-items: center; user-select: none; }
     .phone-input-wrap input { border: none; height: 100%; border-radius: 0; padding-left: 8px; }
 
-    /* CONTENEDOR DE TÉRMINOS CON RESALTO UX */
     .terms-wrap { 
       margin-bottom: 18px; 
       display: flex; 
@@ -117,7 +116,7 @@
       border: 1px solid transparent;
       transition: all 0.3s ease;
     }
-    .terms-wrap.highlight-terms-error {
+    .terms-wrap.highlight-terms-error { 
       background-color: var(--bg-error-light);
       border-color: var(--border-error);
       box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
@@ -224,7 +223,6 @@
     .canvas-page-wrapper canvas { display: block; }
     .page-label-badge { position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.75); color: #ffffff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; z-index: 5; pointer-events: none; }
 
-    /* ZONA DE FIRMA FLOTANTE Y DINÁMICA (TOUCH + CURSOR) */
     #floatingSignGroup {
       position: absolute;
       width: 210px;
@@ -551,7 +549,8 @@
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    const API_URL = "https://celerdoc.onrender.com";
+    // Detección automática del servidor (usa el servidor local si se prueba en localhost)
+    const API_URL = (window.location.protocol.startsWith('http')) ? window.location.origin : "https://celerdoc.onrender.com";
     const CODIGO_OTP_SIMULADO = "123456";
     const MAX_INTENTOS_OTP = 5;
     let intentosFallidosOTP = 0;
@@ -560,6 +559,12 @@
     let timestampAceptacionTermsUtc = "";
     let timestampOtpValidadoUtc = "";
     let timestampTrazoFirmaUtc = "";
+
+    function generarHashUnicoTransaccion() {
+      const randomValues = new Uint8Array(32);
+      crypto.getRandomValues(randomValues);
+      return Array.from(randomValues).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
     const catalogoPaises = [
       { codigo: "CO", nombre: "Colombia", indicativo: "+57", bandera: "🇨🇴", lang: "es" },
@@ -946,9 +951,9 @@
       trazo_firma_png: '',
       pkcs7_aplicado: {
         posicion_final: 'left_vertical',
-        hash: 'c2a9d8f3e5b10478bc64df91e021a876fa5e9b31d472c08416d8a9e6b21c45df',
+        hash: generarHashUnicoTransaccion(),
         algoritmo: 'SHA256withRSA / PKCS#7 Container',
-        qr_data: 'https://celerdoc.onrender.com/validar?sig=c2a9d8f3e5b10478bc64df91e021a876',
+        qr_data: `${API_URL}/validar`,
         status: 'VALID'
       }
     };
@@ -1190,6 +1195,11 @@
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       datosTrazabilidad.sha256_original = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
+      // Generar hash PKCS#7 único para este documento
+      const uniqueHash = generarHashUnicoTransaccion();
+      datosTrazabilidad.pkcs7_aplicado.hash = uniqueHash;
+      datosTrazabilidad.pkcs7_aplicado.qr_data = `${API_URL}/validar?sig=${uniqueHash.substring(0, 32)}`;
+
       pdfActual = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       datosTrazabilidad.total_paginas = pdfActual.numPages;
 
@@ -1336,8 +1346,8 @@
         } else {
           const pageRef = await pdfActual.getPage(pdfActual.numPages);
           const vpRef = pageRef.getViewport({ scale: escalaActual });
-          canvasPrev.width = vpPrev.width;
-          canvasPrev.height = vpPrev.height;
+          canvasPrev.width = vpRef.width;
+          canvasPrev.height = vpRef.height;
           ctxPrev.fillStyle = (temaActual === 'dark') ? '#1e293b' : '#ffffff';
           ctxPrev.fillRect(0, 0, canvasPrev.width, canvasPrev.height);
         }
