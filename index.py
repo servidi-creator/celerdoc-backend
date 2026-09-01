@@ -80,7 +80,7 @@ async def validar_consulta_publica(
     request: Request,
     sig: Optional[str] = None
 ):
-    """Página de Consulta Pública con simetría exacta frente a la Hoja de Auditoría."""
+    """Página de Consulta Pública sincronizada exactamente con la Hoja de Auditoría."""
     ahora_consulta = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     sig_key = sig or "No especificado"
 
@@ -602,13 +602,13 @@ async def procesar_firma(payload: FirmaPayload, request: Request, background_tas
         
         nombre_original_limpio = payload.nombre_archivo if payload.nombre_archivo.lower().endswith(".pdf") else f"{payload.nombre_archivo}.pdf"
         
-        # CONSTRUCCIÓN EXACTA DEL NOMBRE DEL ARCHIVO FINAL:
-        # [NombreOriginal]_[TipoDoc]_[NumDoc]_[Año]_[Mes]_[Día]_[Hora]_[Minuto]_[Segundo].pdf
+        # ESTRUCTURA EXACTA SOLICITADA:
+        # [NombreOriginal]_[TipoDoc][NumDoc]_[YYYYMMDDHHMMSS].pdf
         nombre_base_sin_ext = os.path.splitext(nombre_original_limpio)[0]
         tipo_doc_val = payload.codigo_tipo_doc or "CC"
         num_doc_limpio = "".join(c for c in payload.numero_documento if c.isalnum())
-        sufijo_tiempo = ahora_utc.strftime("%Y_%m_%d_%H_%M_%S")
-        nombre_final = f"{nombre_base_sin_ext}_{tipo_doc_val}_{num_doc_limpio}_{sufijo_tiempo}.pdf"
+        sufijo_tiempo = ahora_utc.strftime("%Y%m%d%H%M%S")
+        nombre_final = f"{nombre_base_sin_ext}_{tipo_doc_val}{num_doc_limpio}_{sufijo_tiempo}.pdf"
 
         entropia_unica = uuid.uuid4().hex
         pkcs7_hash_real = hashlib.sha256(f"{sha256_original}{entropia_unica}{timestamp_sellado_utc}{validador_id}".encode()).hexdigest()
