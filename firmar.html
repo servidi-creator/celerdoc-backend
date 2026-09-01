@@ -320,7 +320,7 @@
       transform: translateX(-50%);
     }
 
-    /* MODAL DE FIRMA CON PESTAÑAS (TRAZO / IMAGEN) */
+    /* MODAL DE FIRMA */
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
@@ -362,7 +362,7 @@
     #canvasFullscreenPad { width: 100%; height: 100%; display: block; border-radius: 6px; }
     .pad-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; color: #94a3b8; pointer-events: none; font-weight: 400; }
 
-    /* CONTENEDOR DE IMAGEN Y REDIMENSIONAMIENTO PROPORCIONAL */
+    /* CONTENEDOR DE IMAGEN (ARRASTRE + REDIMENSIÓN PROPORCIONAL) */
     #imageSignContainer {
       width: 100%;
       height: 210px;
@@ -372,17 +372,19 @@
       position: relative;
       margin-bottom: 16px;
       display: none;
-      align-items: center;
-      justify-content: center;
       overflow: hidden;
       user-select: none;
+      -webkit-user-select: none;
       touch-action: none;
     }
     .image-placeholder-box {
+      width: 100%;
+      height: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      justify-content: center;
+      gap: 8px;
       cursor: pointer;
       color: var(--text-muted);
       font-size: 13px;
@@ -390,32 +392,46 @@
     .btn-choose-img {
       background: var(--brand-primary);
       color: #ffffff;
-      padding: 6px 14px;
+      padding: 7px 16px;
       border-radius: 6px;
-      font-size: 12px;
+      font-size: 12.5px;
       font-weight: 600;
       cursor: pointer;
     }
-    #imgSignatureElement {
+    
+    #imgWrapper {
       position: absolute;
-      touch-action: none;
       display: none;
-      cursor: move;
-      border: 1px dashed #3366CC;
+      cursor: grab;
+      border: 1.5px dashed #3366CC;
+      background: rgba(51, 102, 204, 0.06);
+      touch-action: none;
+      box-sizing: border-box;
+    }
+    #imgWrapper:active {
+      cursor: grabbing;
+    }
+    #imgSignatureElement {
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
     }
     .resize-handle {
       position: absolute;
-      width: 14px;
-      height: 14px;
+      width: 18px;
+      height: 18px;
       background: #3366CC;
       border: 2px solid #ffffff;
       border-radius: 50%;
-      right: -7px;
-      bottom: -7px;
+      right: -9px;
+      bottom: -9px;
       cursor: nwse-resize;
-      display: none;
       touch-action: none;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      z-index: 20;
     }
 
     .modal-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
@@ -511,13 +527,11 @@
       </div>
     </div>
 
-    <!-- CASILLA DE TÉRMINOS CON SCROLL Y RESALTO UX -->
     <div class="terms-wrap" id="wrapTerms">
       <input type="checkbox" id="chkTerms">
       <label for="chkTerms" id="lblTerms">Acepto los Términos, Condiciones y Política de Privacidad de Celerdoc.</label>
     </div>
 
-    <!-- BOTÓN / ZONA DE CARGA UX -->
     <div class="dropzone-container" id="dropArea" onclick="document.getElementById('fileInput').click()">
       <div class="dropzone-action-btn">
         <span>📂</span>
@@ -579,7 +593,6 @@
       </div>
     </div>
 
-    <!-- MODAL DE FIRMA MULTI-OPCIÓN (TRAZO O IMAGEN) -->
     <div class="modal-overlay" id="modalSignaturePad">
       <div class="modal-card">
         <h3>Definir Firma Electrónica</h3>
@@ -589,22 +602,20 @@
           <button type="button" class="tab-btn" id="tabUploadImg">🖼️ Cargar Imagen</button>
         </div>
         
-        <!-- Pestaña 1: Trazo Manuscrito -->
         <div class="signature-pad-container" id="padContainer">
           <canvas id="canvasFullscreenPad"></canvas>
           <span class="pad-placeholder" id="fullscreenPadPlaceholder">Trace aquí su firma con el dedo o mouse</span>
         </div>
 
-        <!-- Pestaña 2: Imagen con Redimensionamiento Proporcional -->
         <div id="imageSignContainer">
           <div class="image-placeholder-box" id="boxImgPlaceholder" onclick="document.getElementById('inputSignImgFile').click()">
-            <span>📂 Seleccione su imagen de firma (PNG, JPG, WEBP, etc.)</span>
+            <span>📂 Haga clic para seleccionar imagen de firma (PNG, JPG, WEBP, etc.)</span>
             <span class="btn-choose-img">Examinar archivo</span>
           </div>
           <input type="file" id="inputSignImgFile" accept="image/*">
-          <div id="imgWrapper" style="position: relative; display: inline-block;">
+          <div id="imgWrapper">
             <img id="imgSignatureElement" alt="Firma">
-            <div class="resize-handle" id="imgResizeHandle"></div>
+            <div class="resize-handle" id="imgResizeHandle" title="Arrastra para redimensionar proporcionalmente"></div>
           </div>
         </div>
 
@@ -1032,6 +1043,18 @@
     let throttleTimeoutId = null;
     let countdownIntervalId = null;
 
+    // GENERADOR DINÁMICO DE HASH PKCS7 ÚNICO EN EL NAVEGADOR
+    async function generarHashPKCS7Dinamico() {
+      const arrayAleatorio = new Uint8Array(32);
+      window.crypto.getRandomValues(arrayAleatorio);
+      const strSemilla = `${Date.now()}_${Math.random()}_${Array.from(arrayAleatorio).join('')}`;
+      const encoder = new TextEncoder();
+      const data = encoder.encode(strSemilla);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     let datosTrazabilidad = {
       nombre_archivo: '',
       sha256_original: '',
@@ -1042,9 +1065,9 @@
       trazo_firma_png: '',
       pkcs7_aplicado: {
         posicion_final: 'left_vertical',
-        hash: 'c2a9d8f3e5b10478bc64df91e021a876fa5e9b31d472c08416d8a9e6b21c45df',
+        hash: '',
         algoritmo: 'SHA256withRSA / PKCS#7 Container',
-        qr_data: 'https://celerdoc.onrender.com/validar?sig=c2a9d8f3e5b10478bc64df91e021a876',
+        qr_data: '',
         status: 'VALID'
       }
     };
@@ -1086,17 +1109,19 @@
     const imageSignContainer = document.getElementById('imageSignContainer');
     const boxImgPlaceholder = document.getElementById('boxImgPlaceholder');
     const inputSignImgFile = document.getElementById('inputSignImgFile');
+    const imgWrapper = document.getElementById('imgWrapper');
     const imgSignatureElement = document.getElementById('imgSignatureElement');
     const imgResizeHandle = document.getElementById('imgResizeHandle');
 
-    let modoFirmaActual = 'draw'; // 'draw' o 'image'
+    let modoFirmaActual = 'draw';
     let isDrawingFullscreen = false;
     let haCompletadoTrazo = false;
-    let imgOriginalWidth = 0;
-    let imgOriginalHeight = 0;
     let imgAspectRatio = 1.0;
-    let currentImgW = 140;
-    let currentImgH = 70;
+    
+    let imgPosX = 0;
+    let imgPosY = 0;
+    let imgWidth = 140;
+    let imgHeight = 70;
 
     tabDraw.addEventListener('click', () => {
       modoFirmaActual = 'draw';
@@ -1112,7 +1137,7 @@
       tabUploadImg.classList.add('active');
       tabDraw.classList.remove('active');
       padContainer.style.display = 'none';
-      imageSignContainer.style.display = 'flex';
+      imageSignContainer.style.display = 'block';
     });
 
     inputSignImgFile.addEventListener('change', (e) => {
@@ -1122,29 +1147,33 @@
         reader.onload = (evt) => {
           const img = new Image();
           img.onload = () => {
-            imgOriginalWidth = img.width;
-            imgOriginalHeight = img.height;
             imgAspectRatio = img.width / img.height;
 
-            const maxW = 180;
-            const maxH = 90;
+            const cWidth = imageSignContainer.clientWidth || 450;
+            const cHeight = imageSignContainer.clientHeight || 210;
+
+            const maxW = Math.min(220, cWidth * 0.65);
+            const maxH = Math.min(110, cHeight * 0.65);
+
             if (imgAspectRatio >= 1) {
-              currentImgW = maxW;
-              currentImgH = maxW / imgAspectRatio;
-              if (currentImgH > maxH) {
-                currentImgH = maxH;
-                currentImgW = maxH * imgAspectRatio;
+              imgWidth = maxW;
+              imgHeight = maxW / imgAspectRatio;
+              if (imgHeight > maxH) {
+                imgHeight = maxH;
+                imgWidth = maxH * imgAspectRatio;
               }
             } else {
-              currentImgH = maxH;
-              currentImgW = maxH * imgAspectRatio;
+              imgHeight = maxH;
+              imgWidth = maxH * imgAspectRatio;
             }
 
+            imgPosX = (cWidth - imgWidth) / 2;
+            imgPosY = (cHeight - imgHeight) / 2;
+
             imgSignatureElement.src = evt.target.result;
-            imgSignatureElement.style.width = `${currentImgW}px`;
-            imgSignatureElement.style.height = `${currentImgH}px`;
-            imgSignatureElement.style.display = 'block';
-            imgResizeHandle.style.display = 'block';
+            actualizarEstilosImgWrapper();
+
+            imgWrapper.style.display = 'block';
             boxImgPlaceholder.style.display = 'none';
             haCompletadoTrazo = true;
           };
@@ -1154,62 +1183,159 @@
       }
     });
 
-    // REDIMENSIONAMIENTO PROPORCIONAL DE IMAGEN
+    function actualizarEstilosImgWrapper() {
+      imgWrapper.style.left = `${imgPosX}px`;
+      imgWrapper.style.top = `${imgPosY}px`;
+      imgWrapper.style.width = `${imgWidth}px`;
+      imgWrapper.style.height = `${imgHeight}px`;
+    }
+
+    let isDraggingImg = false;
+    let dragStartMouseX = 0;
+    let dragStartMouseY = 0;
+    let dragStartPosX = 0;
+    let dragStartPosY = 0;
+
+    imgWrapper.addEventListener('mousedown', (e) => {
+      if (e.target === imgResizeHandle) return;
+      isDraggingImg = true;
+      dragStartMouseX = e.clientX;
+      dragStartMouseY = e.clientY;
+      dragStartPosX = imgPosX;
+      dragStartPosY = imgPosY;
+      e.stopPropagation();
+      e.preventDefault();
+    });
+
+    imgWrapper.addEventListener('touchstart', (e) => {
+      if (e.target === imgResizeHandle) return;
+      isDraggingImg = true;
+      dragStartMouseX = e.touches[0].clientX;
+      dragStartMouseY = e.touches[0].clientY;
+      dragStartPosX = imgPosX;
+      dragStartPosY = imgPosY;
+      e.stopPropagation();
+    }, { passive: false });
+
     let isResizingImg = false;
-    let startResizeX = 0;
-    let startResizeW = 0;
+    let resizeStartMouseX = 0;
+    let resizeStartWidth = 0;
 
     imgResizeHandle.addEventListener('mousedown', (e) => {
       isResizingImg = true;
-      startResizeX = e.clientX;
-      startResizeW = currentImgW;
+      resizeStartMouseX = e.clientX;
+      resizeStartWidth = imgWidth;
       e.stopPropagation();
       e.preventDefault();
     });
 
     imgResizeHandle.addEventListener('touchstart', (e) => {
       isResizingImg = true;
-      startResizeX = e.touches[0].clientX;
-      startResizeW = currentImgW;
+      resizeStartMouseX = e.touches[0].clientX;
+      resizeStartWidth = imgWidth;
       e.stopPropagation();
     }, { passive: false });
 
     window.addEventListener('mousemove', (e) => {
-      if (!isResizingImg) return;
-      const deltaX = e.clientX - startResizeX;
-      let newW = Math.max(50, Math.min(260, startResizeW + deltaX));
-      let newH = newW / imgAspectRatio;
-      currentImgW = newW;
-      currentImgH = newH;
-      imgSignatureElement.style.width = `${currentImgW}px`;
-      imgSignatureElement.style.height = `${currentImgH}px`;
+      if (!isDraggingImg && !isResizingImg) return;
+      
+      const cWidth = imageSignContainer.clientWidth || 450;
+      const cHeight = imageSignContainer.clientHeight || 210;
+
+      if (isDraggingImg) {
+        const deltaX = e.clientX - dragStartMouseX;
+        const deltaY = e.clientY - dragStartMouseY;
+        
+        let newX = dragStartPosX + deltaX;
+        let newY = dragStartPosY + deltaY;
+
+        newX = Math.max(0, Math.min(cWidth - imgWidth, newX));
+        newY = Math.max(0, Math.min(cHeight - imgHeight, newY));
+
+        imgPosX = newX;
+        imgPosY = newY;
+        actualizarEstilosImgWrapper();
+      }
+
+      if (isResizingImg) {
+        const deltaX = e.clientX - resizeStartMouseX;
+        let newW = Math.max(40, Math.min(cWidth - imgPosX, resizeStartWidth + deltaX));
+        let newH = newW / imgAspectRatio;
+
+        if (imgPosY + newH > cHeight) {
+          newH = cHeight - imgPosY;
+          newW = newH * imgAspectRatio;
+        }
+
+        imgWidth = newW;
+        imgHeight = newH;
+        actualizarEstilosImgWrapper();
+      }
     });
 
     window.addEventListener('touchmove', (e) => {
-      if (!isResizingImg) return;
-      const deltaX = e.touches[0].clientX - startResizeX;
-      let newW = Math.max(50, Math.min(260, startResizeW + deltaX));
-      let newH = newW / imgAspectRatio;
-      currentImgW = newW;
-      currentImgH = newH;
-      imgSignatureElement.style.width = `${currentImgW}px`;
-      imgSignatureElement.style.height = `${currentImgH}px`;
+      if (!isDraggingImg && !isResizingImg) return;
+      
+      const cWidth = imageSignContainer.clientWidth || 450;
+      const cHeight = imageSignContainer.clientHeight || 210;
+
+      if (isDraggingImg) {
+        const deltaX = e.touches[0].clientX - dragStartMouseX;
+        const deltaY = e.touches[0].clientY - dragStartMouseY;
+        
+        let newX = dragStartPosX + deltaX;
+        let newY = dragStartPosY + deltaY;
+
+        newX = Math.max(0, Math.min(cWidth - imgWidth, newX));
+        newY = Math.max(0, Math.min(cHeight - imgHeight, newY));
+
+        imgPosX = newX;
+        imgPosY = newY;
+        actualizarEstilosImgWrapper();
+      }
+
+      if (isResizingImg) {
+        const deltaX = e.touches[0].clientX - resizeStartMouseX;
+        let newW = Math.max(40, Math.min(cWidth - imgPosX, resizeStartWidth + deltaX));
+        let newH = newW / imgAspectRatio;
+
+        if (imgPosY + newH > cHeight) {
+          newH = cHeight - imgPosY;
+          newW = newH * imgAspectRatio;
+        }
+
+        imgWidth = newW;
+        imgHeight = newH;
+        actualizarEstilosImgWrapper();
+      }
     }, { passive: false });
 
-    window.addEventListener('mouseup', () => { isResizingImg = false; });
-    window.addEventListener('touchend', () => { isResizingImg = false; });
+    window.addEventListener('mouseup', () => { 
+      isDraggingImg = false; 
+      isResizingImg = false; 
+    });
+    window.addEventListener('touchend', () => { 
+      isDraggingImg = false; 
+      isResizingImg = false; 
+    });
 
     function renderizarImagenEnCanvasFinal() {
       const c = document.createElement('canvas');
+      const cWidth = imageSignContainer.clientWidth || 450;
+      const cHeight = imageSignContainer.clientHeight || 210;
+
       c.width = 400;
       c.height = 160;
       const ctx = c.getContext('2d');
       ctx.clearRect(0, 0, c.width, c.height);
 
-      const drawW = Math.min(c.width * 0.9, currentImgW * 1.5);
-      const drawH = drawW / imgAspectRatio;
-      const drawX = (c.width - drawW) / 2;
-      const drawY = (c.height - drawH) / 2;
+      const scaleX = c.width / cWidth;
+      const scaleY = c.height / cHeight;
+
+      const drawX = imgPosX * scaleX;
+      const drawY = imgPosY * scaleY;
+      const drawW = imgWidth * scaleX;
+      const drawH = imgHeight * scaleY;
 
       ctx.drawImage(imgSignatureElement, drawX, drawY, drawW, drawH);
       return c.toDataURL('image/png');
@@ -1296,8 +1422,7 @@
         datosTrazabilidad.trazo_firma_png = '';
       } else {
         imgSignatureElement.src = '';
-        imgSignatureElement.style.display = 'none';
-        imgResizeHandle.style.display = 'none';
+        imgWrapper.style.display = 'none';
         boxImgPlaceholder.style.display = 'flex';
         inputSignImgFile.value = '';
         haCompletadoTrazo = false;
@@ -1335,10 +1460,15 @@
       setTimeout(() => inputOtp.focus(), 100);
     });
 
-    function renderizarEstampaPKCS7() {
+    async function renderizarEstampaPKCS7() {
       const contenedor = document.getElementById('wrapperActive');
       const badgeExistente = document.getElementById('pkcs7BadgeElement');
       if (badgeExistente) badgeExistente.remove();
+
+      if (!datosTrazabilidad.pkcs7_aplicado.hash) {
+        datosTrazabilidad.pkcs7_aplicado.hash = await generarHashPKCS7Dinamico();
+        datosTrazabilidad.pkcs7_aplicado.qr_data = `${API_URL}/validar?sig=${datosTrazabilidad.pkcs7_aplicado.hash.substring(0, 32)}`;
+      }
 
       const pkcs = datosTrazabilidad.pkcs7_aplicado;
       const badge = document.createElement('div');
@@ -1418,6 +1548,10 @@
       timestampCargaDocUtc = new Date().toISOString();
       datosTrazabilidad.timestamp_utc = timestampCargaDocUtc;
       
+      // Reiniciar y calcular nuevo hash dinámico para este documento
+      datosTrazabilidad.pkcs7_aplicado.hash = await generarHashPKCS7Dinamico();
+      datosTrazabilidad.pkcs7_aplicado.qr_data = `${API_URL}/validar?sig=${datosTrazabilidad.pkcs7_aplicado.hash.substring(0, 32)}`;
+
       document.getElementById('txtBtnAccion').textContent = "Reemplazar documento";
       document.getElementById('txtDropSubtitle').textContent = `Documento cargado: ${datosTrazabilidad.nombre_archivo}`;
 
@@ -1611,7 +1745,7 @@
         floatingSignGroup.style.display = 'flex';
       }
 
-      renderizarEstampaPKCS7();
+      await renderizarEstampaPKCS7();
     }
 
     let isDraggingMarker = false;
