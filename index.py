@@ -80,7 +80,7 @@ async def validar_consulta_publica(
     request: Request,
     sig: Optional[str] = None
 ):
-    """Página de Consulta Pública que recupera los datos exactos desde la BD local mediante el token 'sig'."""
+    """Página de Consulta Pública con simetría exacta frente a la Hoja de Auditoría."""
     ahora_consulta = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     sig_key = sig or "No especificado"
 
@@ -321,7 +321,7 @@ def cargar_configuracion_estilos():
 
 
 def generar_qr_bytes(data_texto: str) -> bytes:
-    """Genera código QR limpio, ampliado (box_size=4) y fácil de leer para cualquier cámara móvil."""
+    """Genera código QR limpio, ampliado y fácil de leer para cualquier cámara móvil."""
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -555,7 +555,7 @@ def ejecutar_sellado_y_auditoria_fondo(
 
 class FirmaPayload(BaseModel):
     nombre_archivo: str
-    nombre_final_sugerido: str
+    nombre_final_sugerido: Optional[str] = None
     archivo_base64: str
     tipo_documento: str
     codigo_tipo_doc: Optional[str] = "CC"
@@ -601,9 +601,14 @@ async def procesar_firma(payload: FirmaPayload, request: Request, background_tas
         id_completo_texto = f"{payload.codigo_tipo_doc}: {payload.numero_documento}"
         
         nombre_original_limpio = payload.nombre_archivo if payload.nombre_archivo.lower().endswith(".pdf") else f"{payload.nombre_archivo}.pdf"
-        nombre_final = payload.nombre_final_sugerido or f"documento_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-        if not nombre_final.lower().endswith(".pdf"):
-            nombre_final += ".pdf"
+        
+        # CONSTRUCCIÓN EXACTA DEL NOMBRE DEL ARCHIVO FINAL:
+        # [NombreOriginal]_[TipoDoc]_[NumDoc]_[Año]_[Mes]_[Día]_[Hora]_[Minuto]_[Segundo].pdf
+        nombre_base_sin_ext = os.path.splitext(nombre_original_limpio)[0]
+        tipo_doc_val = payload.codigo_tipo_doc or "CC"
+        num_doc_limpio = "".join(c for c in payload.numero_documento if c.isalnum())
+        sufijo_tiempo = ahora_utc.strftime("%Y_%m_%d_%H_%M_%S")
+        nombre_final = f"{nombre_base_sin_ext}_{tipo_doc_val}_{num_doc_limpio}_{sufijo_tiempo}.pdf"
 
         entropia_unica = uuid.uuid4().hex
         pkcs7_hash_real = hashlib.sha256(f"{sha256_original}{entropia_unica}{timestamp_sellado_utc}{validador_id}".encode()).hexdigest()
@@ -619,7 +624,6 @@ async def procesar_firma(payload: FirmaPayload, request: Request, background_tas
         ts_otp = payload.timestamp_otp or timestamp_sellado_utc
         total_pags_cert = f"{payload.total_paginas_con_extras + 1} paginas (incluye hoja de auditoria)"
 
-        # Enlace QR ultra corto optimizado para lectura instantánea en cualquier cámara móvil
         pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={hash_corto}"
 
         client_ip = request.client.host if request.client else "186.84.92.145"
