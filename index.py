@@ -325,34 +325,6 @@ def hex_to_rgb(hex_str: str):
     return (0.1, 0.1, 0.1)
 
 
-def enmascarar_ip(ip: str) -> str:
-    """Enmascara la IP mostrando los primeros 2 segmentos y el último."""
-    if not ip or ip in ("127.0.0.1", "localhost", "::1"):
-        ip = "186.84.92.145"
-    partes = ip.split('.')
-    if len(partes) == 4:
-        return f"{partes[0]}.***.***.{partes[3]}"
-    return f"{ip[:3]}***{ip[-2:]}"
-
-
-def enmascarar_gps(lat, lon) -> str:
-    """Formatea GPS con signo, 2 enteros y 4 decimales mostrando únicamente los 2 últimos dígitos."""
-    def fmt(val):
-        if val is None:
-            return "+**.**00"
-        try:
-            f = float(val)
-            sign = "+" if f >= 0 else "-"
-            abs_val = abs(f)
-            int_part = int(abs_val)
-            dec_part = int(round((abs_val - int_part) * 10000))
-            dec_str = f"{dec_part:04d}"
-            return f"{sign}**.**{dec_str[-2:]}"
-        except Exception:
-            return "+**.**00"
-    return f"Lat: {fmt(lat)}, Lon: {fmt(lon)}"
-
-
 def cargar_configuracion_estilos():
     """Carga la plantilla de diseño de firma desde estilos_firmas.json."""
     if os.path.exists(CONFIG_JSON_PATH):
@@ -471,8 +443,8 @@ def generar_pdf_firmado_y_guardar(
     pkcs7_hash_real: str,
     hash_corto: str,
     pkcs7_qr_url: str,
-    ip_enmascarada: str,
-    gps_enmascarado: str,
+    ip_real: str,
+    gps_real: str,
     firmante_completo: str,
     ts_carga: str,
     ts_terms: str,
@@ -540,8 +512,8 @@ def generar_pdf_firmado_y_guardar(
         ("Codigo Validador Transaccion", validador_id),
         ("Codigo OTP Enviado y Verificado", f"OTP-{codigo_otp_validado or '123456'}"),
         ("Aceptacion y Validacion OTP", f"Aceptado y autenticado con exito ({ts_otp[:19]} UTC)"),
-        ("Direccion IP del Firmante", f"{ip_enmascarada} (Registrada: {ts_otp[:19]} UTC)"),
-        ("Geolocalizacion GPS", f"{gps_enmascarado} (Capturada: {ts_trazo[:19]} UTC)"),
+        ("Direccion IP del Firmante", f"{ip_real} (Registrada: {ts_otp[:19]} UTC)"),
+        ("Geolocalizacion GPS", f"{gps_real} (Capturada: {ts_trazo[:19]} UTC)"),
         ("Ubicacion de Sello en Documento", f"Pagina {pagina_seleccionada} [X: {x_pct}%, Y: {y_pct}%]"),
         ("Total Paginas Certificadas", total_pags_cert),
         ("Sellado Final de Integridad UTC", timestamp_sellado_utc)
@@ -573,7 +545,7 @@ def generar_pdf_firmado_y_guardar(
     y_offset += alto_bloque_qr + 8
     rect_fila_aviso = fitz.Rect(42, y_offset, 553, y_offset + 32)
     pagina_auditoria.draw_rect(rect_fila_aviso, color=(0.75, 0.83, 0.95), fill=(0.95, 0.97, 1.0), width=0.6)
-    pagina_auditoria.insert_text(fitz.Point(76, y_offset + 12), "• Privacidad: La direccion IP y las coordenadas GPS se presentan enmascaradas para proteger la confidencialidad.", fontsize=5.8, color=(0.18, 0.23, 0.32))
+    pagina_auditoria.insert_text(fitz.Point(76, y_offset + 12), "• Transparencia: Los registros de IP y coordenadas GPS se almacenan de forma exacta para auditoria.", fontsize=5.8, color=(0.18, 0.23, 0.32))
     pagina_auditoria.insert_text(fitz.Point(76, y_offset + 23), "• Respaldo legal: Los registros originales permanecen custodiados bajo estandares de seguridad en Celerdoc.", fontsize=5.8, color=(0.18, 0.23, 0.32))
 
     pagina_auditoria.draw_line(fitz.Point(42, 792), fitz.Point(553, 792), color=color_azul_corp, width=0.6)
@@ -608,8 +580,8 @@ def generar_pdf_firmado_y_guardar(
         "ts_terminos": ts_terms,
         "ts_trazo": ts_trazo,
         "ts_otp": ts_otp,
-        "ip_enmascarada": ip_enmascarada,
-        "gps_enmascarado": gps_enmascarado
+        "ip_enmascarada": ip_real,
+        "gps_enmascarado": gps_real
     })
 
 
@@ -682,9 +654,14 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
 
         pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={reporte_id_unico}"
 
+        # Obtención de datos reales y directos (Sin máscaras)
         client_ip = request.client.host if request.client else "186.84.92.145"
-        ip_enmascarada = enmascarar_ip(client_ip)
-        gps_enmascarado = enmascarar_gps(payload.latitud_raw, payload.longitud_raw)
+        ip_real = client_ip
+        
+        if payload.latitud_raw is not None and payload.longitud_raw is not None:
+            gps_real = f"Lat: {payload.latitud_raw}, Lon: {payload.longitud_raw}"
+        else:
+            gps_real = "No disponible / No proporcionado"
 
         pkcs7_info_final = {
             "posicion_final": payload.pkcs7_info.get("posicion_final", "left_vertical") if payload.pkcs7_info else "left_vertical",
@@ -714,8 +691,8 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             pkcs7_hash_real,
             hash_corto,
             pkcs7_qr_url,
-            ip_enmascarada,
-            gps_enmascarado,
+            ip_real,
+            gps_real,
             firmante_completo,
             ts_carga,
             ts_terms,

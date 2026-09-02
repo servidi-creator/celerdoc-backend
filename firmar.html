@@ -643,16 +643,19 @@
       </div>
     </div>
 
+    <!-- PANEL DE ÉXITO ACTUALIZADO CON NUEVOS TEXTOS Y BOTONES UX -->
     <div class="success-card" id="successPanel">
-      <div class="success-title" id="txtSuccessTitle">¡Su documento fue firmado con total éxito!</div>
-      <div class="success-subtitle" id="txtSuccessSubtitle">La estampa corporativa y la hoja de auditoría y trazabilidad han sido incorporadas al PDF certificado.</div>
+      <div class="success-title" id="txtSuccessTitle">¡Firma completada con éxito!</div>
+      <div class="success-subtitle" id="txtSuccessSubtitle">Tu documento ha sido firmado con plena validez legal.</div>
 
       <div class="download-countdown-box" id="downloadCountdownBox">
         Preparando su descarga segura...
       </div>
 
-      <div>
-        <button type="button" class="btn-download" id="btnDescargar">Descargar Nuevo PDF Firmado</button>
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 16px;">
+        <button type="button" class="btn-download" id="btnDescargar" style="display: inline-block; background: #15803d; color: #ffffff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(21, 128, 61, 0.2);">📥 Descargar Nuevo PDF Firmado</button>
+        <button type="button" id="btnFirmarNuevo" style="background: #2563eb; color: #ffffff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); transition: background 0.2s;">🔄 Firmar nuevo documento</button>
+        <button type="button" id="btnSalirSesion" style="background: #64748b; color: #ffffff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(100, 116, 139, 0.2); transition: background 0.2s;">❌ Salir</button>
       </div>
     </div>
 
@@ -727,7 +730,7 @@
         lblBtnFirmar: "✍️ Firmar",
         otpTitulo: "Verificación de Identidad por OTP",
         btnCancelarOtp: "Cancelar",
-        btnDescargar: "Descargar Nuevo PDF Firmado",
+        btnDescargar: "📥 Descargar Nuevo PDF Firmado",
         sugeridosTitulo: "Top 20 Países Sugeridos",
         verTodos: "Otros países (Catálogo completo)...",
         zoomIn: "🔍 Ampliar",
@@ -763,7 +766,7 @@
         lblBtnFirmar: "✍️ Sign",
         otpTitulo: "Identity Verification via OTP",
         btnCancelarOtp: "Cancel",
-        btnDescargar: "Download New Signed PDF",
+        btnDescargar: "📥 Download New Signed PDF",
         sugeridosTitulo: "Top 20 Suggested Countries",
         verTodos: "Other countries (Full catalog)...",
         zoomIn: "🔍 Zoom In",
@@ -1138,6 +1141,8 @@
     const btnCancelarOtpModal = document.getElementById('btnCancelarOtpModal');
     const successPanel = document.getElementById('successPanel');
     const btnDescargar = document.getElementById('btnDescargar');
+    const btnFirmarNuevo = document.getElementById('btnFirmarNuevo');
+    const btnSalirSesion = document.getElementById('btnSalirSesion');
     const btnDescargarLectura = document.getElementById('btnDescargarLectura');
 
     const btnZoomOut = document.getElementById('btnZoomOut');
@@ -1621,7 +1626,7 @@
     markerFirma.addEventListener('touchstart', (e) => {
       if (e.target === resizeHandle) return;
       const t = e.touches[0];
-      iniciarArrastre(t.clientX, t.clientY, e.target);
+      iniciarArrastre(t.clientX, t.clientY, t.target);
       e.stopPropagation();
       e.preventDefault();
     }, { passive: false });
@@ -1735,6 +1740,22 @@
 
     btnDescargar.addEventListener('click', () => {
       if (descargaUrlActual) window.open(descargaUrlActual, '_blank');
+    });
+
+    btnFirmarNuevo.addEventListener('click', () => {
+      location.reload();
+    });
+
+    btnSalirSesion.addEventListener('click', () => {
+      document.body.innerHTML = `
+        <div style="display:flex; justify-content:center; align-items:center; height:90vh; font-family:sans-serif; text-align:center; color:#0f172a;">
+          <div>
+            <h2>Sesión finalizada</h2>
+            <p style="color:#64748b;">Gracias por utilizar Celerdoc. Puede cerrar esta ventana con total tranquilidad.</p>
+            <button onclick="location.reload()" style="margin-top:16px; background:#3366CC; color:#fff; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:600;">Volver al inicio</button>
+          </div>
+        </div>
+      `;
     });
 
     detectarNavegador();
