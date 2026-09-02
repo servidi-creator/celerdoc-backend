@@ -1,4 +1,4 @@
-import os
+﻿import os
 import io
 import json
 import uuid
@@ -6,7 +6,7 @@ import base64
 import hashlib
 from datetime import datetime, timezone
 import traceback
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
@@ -36,7 +36,6 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 
-app.mount("/descargas", StaticFiles(directory=OUTPUT_DIR), name="descargas")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # ==========================================
@@ -104,6 +103,19 @@ async def servir_firmar_html():
     return {"mensaje": "Celerdoc API operativa. Coloque firmar.html en el directorio raíz."}
 
 
+@app.get("/descargas/{nombre_archivo}")
+async def descargar_documento_firmado(nombre_archivo: str):
+    """Entrega el documento firmado generado con las cabeceras adecuadas de descarga."""
+    ruta_pdf = os.path.join(OUTPUT_DIR, nombre_archivo)
+    if os.path.exists(ruta_pdf):
+        return FileResponse(
+            path=ruta_pdf,
+            media_type="application/pdf",
+            filename=nombre_archivo
+        )
+    raise HTTPException(status_code=404, detail="El archivo solicitado no existe o aún se está procesando.")
+
+
 @app.get("/validar", response_class=HTMLResponse)
 async def validar_consulta_publica(
     request: Request,
@@ -153,7 +165,7 @@ async def validar_consulta_publica(
     <body>
         <div class="card">
             <button class="lang-switch" id="btnLang" onclick="alternarIdioma()">English</button>
-            <span class="badge" id="lblBadge">? DOCUMENTO ÍNTEGRO Y VÁLIDO</span>
+            <span class="badge" id="lblBadge">✓ DOCUMENTO ÍNTEGRO Y VÁLIDO</span>
             <h2 id="lblTitulo">Verificación de Integridad y Trazabilidad</h2>
             <p class="sub" id="lblSub">Plataforma Celerdoc • Validación Criptográfica Oficial</p>
 
@@ -205,7 +217,7 @@ async def validar_consulta_publica(
             const i18n = {{
                 es: {{
                     btn: "English",
-                    badge: "? DOCUMENTO ÍNTEGRO Y VÁLIDO",
+                    badge: "✓ DOCUMENTO ÍNTEGRO Y VÁLIDO",
                     titulo: "Verificación de Integridad y Trazabilidad",
                     sub: "Plataforma Celerdoc • Validación Criptográfica Oficial",
                     sec1: "1. Identificación del Reporte y Firmante",
@@ -229,7 +241,7 @@ async def validar_consulta_publica(
                 }},
                 en: {{
                     btn: "Español",
-                    badge: "? VALID & INTACT DOCUMENT",
+                    badge: "✓ VALID & INTACT DOCUMENT",
                     titulo: "Integrity and Traceability Verification",
                     sub: "Celerdoc Platform • Official Cryptographic Validation",
                     sec1: "1. Audit Report & Signer Identification",
@@ -427,7 +439,7 @@ def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
         pagina.insert_text(fitz.Point(68, alto_pag - 18), texto_completo, fontsize=5.5, fontname="courier-bold", color=color_azul)
 
 
-def ejecutar_sellado_y_auditoria_fondo(
+def generar_pdf_firmado_y_guardar(
     pdf_bytes: bytes,
     total_paginas_con_extras: int,
     pagina_seleccionada: int,
@@ -461,125 +473,122 @@ def ejecutar_sellado_y_auditoria_fondo(
     whatsapp_notificacion: Optional[str],
     codigo_otp_validado: Optional[str]
 ):
-    """Tarea asíncrona que procesa el sellado y genera la hoja de auditoría."""
-    try:
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    """Procesa de forma síncrona el sellado del PDF y genera la hoja de auditoría antes de responder."""
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
-        total_paginas_actuales = len(doc)
-        if total_paginas_con_extras > total_paginas_actuales:
-            for _ in range(total_paginas_con_extras - total_paginas_actuales):
-                doc.new_page(width=595, height=842)
+    total_paginas_actuales = len(doc)
+    if total_paginas_con_extras > total_paginas_actuales:
+        for _ in range(total_paginas_con_extras - total_paginas_actuales):
+            doc.new_page(width=595, height=842)
 
-        idx_pag = max(0, min(pagina_seleccionada - 1, len(doc) - 1))
-        pagina_destino = doc[idx_pag]
-        ancho_pag = pagina_destino.rect.width
-        alto_pag = pagina_destino.rect.height
+    idx_pag = max(0, min(pagina_seleccionada - 1, len(doc) - 1))
+    pagina_destino = doc[idx_pag]
+    ancho_pag = pagina_destino.rect.width
+    alto_pag = pagina_destino.rect.height
 
-        x_pct = coordenadas.get("x_pct", 50.0)
-        y_pct = coordenadas.get("y_pct", 85.0)
-        sello_w, sello_h = 200, 80
+    x_pct = coordenadas.get("x_pct", 50.0)
+    y_pct = coordenadas.get("y_pct", 85.0)
+    sello_w, sello_h = 200, 80
 
-        centro_x = (x_pct / 100.0) * ancho_pag
-        centro_y = (y_pct / 100.0) * alto_pag
+    centro_x = (x_pct / 100.0) * ancho_pag
+    centro_y = (y_pct / 100.0) * alto_pag
 
-        rect_x0 = max(10, min(ancho_pag - sello_w - 10, centro_x - (sello_w / 2)))
-        rect_y0 = max(10, min(alto_pag - sello_h - 10, centro_y - (sello_h / 2)))
-        rect_destino = fitz.Rect(rect_x0, rect_y0, rect_x0 + sello_w, rect_y0 + sello_h)
+    rect_x0 = max(10, min(ancho_pag - sello_w - 10, centro_x - (sello_w / 2)))
+    rect_y0 = max(10, min(alto_pag - sello_h - 10, centro_y - (sello_h / 2)))
+    rect_destino = fitz.Rect(rect_x0, rect_y0, rect_x0 + sello_w, rect_y0 + sello_h)
 
-        estampar_bloque_firma_json(pagina_destino, rect_destino, nombre_firmante, id_completo_texto, validador_id, timestamp_sellado_utc, trazo_bytes)
+    estampar_bloque_firma_json(pagina_destino, rect_destino, nombre_firmante, id_completo_texto, validador_id, timestamp_sellado_utc, trazo_bytes)
 
-        if pkcs7_info:
-            estampar_pkcs7_en_pagina(pagina_destino, pkcs7_info)
+    if pkcs7_info:
+        estampar_pkcs7_en_pagina(pagina_destino, pkcs7_info)
 
-        pagina_auditoria = doc.new_page(width=595, height=842)
-        color_azul_corp = (0.2, 0.4, 0.8)
+    pagina_auditoria = doc.new_page(width=595, height=842)
+    color_azul_corp = (0.2, 0.4, 0.8)
 
-        pagina_auditoria.draw_rect(fitz.Rect(42, 38, 553, 76), color=color_azul_corp, fill=(0.96, 0.98, 1.0), width=0.8)
-        pagina_auditoria.insert_text(fitz.Point(54, 56), "Celerdoc: Reporte de Auditoria y Trazabilidad", fontsize=13, color=color_azul_corp)
-        pagina_auditoria.insert_text(fitz.Point(54, 69), "Evidencia de integridad electronica, no repudio y certificacion digital", fontsize=7.5, color=(0.28, 0.33, 0.41))
+    pagina_auditoria.draw_rect(fitz.Rect(42, 38, 553, 76), color=color_azul_corp, fill=(0.96, 0.98, 1.0), width=0.8)
+    pagina_auditoria.insert_text(fitz.Point(54, 56), "Celerdoc: Reporte de Auditoria y Trazabilidad", fontsize=13, color=color_azul_corp)
+    pagina_auditoria.insert_text(fitz.Point(54, 69), "Evidencia de integridad electronica, no repudio y certificacion digital", fontsize=7.5, color=(0.28, 0.33, 0.41))
 
-        pagina_auditoria.draw_rect(fitz.Rect(42, 80, 553, 98), color=color_azul_corp, fill=(1, 1, 1), width=0.6)
-        pagina_auditoria.insert_text(fitz.Point(54, 92), f"ID de Registro:  {reporte_id_unico}", fontsize=7.5, color=color_azul_corp)
+    pagina_auditoria.draw_rect(fitz.Rect(42, 80, 553, 98), color=color_azul_corp, fill=(1, 1, 1), width=0.6)
+    pagina_auditoria.insert_text(fitz.Point(54, 92), f"ID de Registro:  {reporte_id_unico}", fontsize=7.5, color=color_azul_corp)
 
-        total_pags_cert = f"{len(doc)} paginas (incluye hoja de auditoria)"
+    total_pags_cert = f"{len(doc)} paginas (incluye hoja de auditoria)"
 
-        filas_auditoria = [
-            ("Documento Original", f"{nombre_original_limpio} (Cargado: {ts_carga[:19]} UTC)"),
-            ("Documento Final Certificado", nombre_final),
-            ("Firmante Certificado", nombre_firmante),
-            ("Identificacion del Firmante", f"{tipo_documento} [{numero_documento}]"),
-            ("Canales de Notificacion", f"Email: {email_notificacion} | Movil: {whatsapp_notificacion}"),
-            ("Aceptacion Terminos y Privacidad", f"Aceptado expresamente por el firmante ({ts_terms[:19]} UTC)"),
-            ("SHA-256 Documento Original", sha256_original),
-            ("SHA-256 Documento con Firma", sha256_final_certificado),
-            ("Hash Biometrico del Trazo", sha256_trazo[:48] + ("..." if len(sha256_trazo) > 48 else "")),
-            ("Contenedor Firma PKCS#7", pkcs7_serial),
-            ("Sello Hash Digital PKCS #7", pkcs7_hash_real),
-            ("Codigo Validador Transaccion", validador_id),
-            ("Codigo OTP Enviado y Verificado", f"OTP-{codigo_otp_validado or '123456'}"),
-            ("Aceptacion y Validacion OTP", f"Aceptado y autenticado con exito ({ts_otp[:19]} UTC)"),
-            ("Direccion IP del Firmante", f"{ip_enmascarada} (Registrada: {ts_otp[:19]} UTC)"),
-            ("Geolocalizacion GPS", f"{gps_enmascarado} (Capturada: {ts_trazo[:19]} UTC)"),
-            ("Ubicacion de Sello en Documento", f"Pagina {pagina_seleccionada} [X: {x_pct}%, Y: {y_pct}%]"),
-            ("Total Paginas Certificadas", total_pags_cert),
-            ("Sellado Final de Integridad UTC", timestamp_sellado_utc)
-        ]
+    filas_auditoria = [
+        ("Documento Original", f"{nombre_original_limpio} (Cargado: {ts_carga[:19]} UTC)"),
+        ("Documento Final Certificado", nombre_final),
+        ("Firmante Certificado", nombre_firmante),
+        ("Identificacion del Firmante", f"{tipo_documento} [{numero_documento}]"),
+        ("Canales de Notificacion", f"Email: {email_notificacion} | Movil: {whatsapp_notificacion}"),
+        ("Aceptacion Terminos y Privacidad", f"Aceptado expresamente por el firmante ({ts_terms[:19]} UTC)"),
+        ("SHA-256 Documento Original", sha256_original),
+        ("SHA-256 Documento con Firma", sha256_final_certificado),
+        ("Hash Biometrico del Trazo", sha256_trazo[:48] + ("..." if len(sha256_trazo) > 48 else "")),
+        ("Contenedor Firma PKCS#7", pkcs7_serial),
+        ("Sello Hash Digital PKCS #7", pkcs7_hash_real),
+        ("Codigo Validador Transaccion", validador_id),
+        ("Codigo OTP Enviado y Verificado", f"OTP-{codigo_otp_validado or '123456'}"),
+        ("Aceptacion y Validacion OTP", f"Aceptado y autenticado con exito ({ts_otp[:19]} UTC)"),
+        ("Direccion IP del Firmante", f"{ip_enmascarada} (Registrada: {ts_otp[:19]} UTC)"),
+        ("Geolocalizacion GPS", f"{gps_enmascarado} (Capturada: {ts_trazo[:19]} UTC)"),
+        ("Ubicacion de Sello en Documento", f"Pagina {pagina_seleccionada} [X: {x_pct}%, Y: {y_pct}%]"),
+        ("Total Paginas Certificadas", total_pags_cert),
+        ("Sellado Final de Integridad UTC", timestamp_sellado_utc)
+    ]
 
-        y_offset = 104
-        alto_fila = 15.5
-        
-        for etiqueta, valor in filas_auditoria:
-            pagina_auditoria.draw_rect(fitz.Rect(42, y_offset, 553, y_offset + alto_fila), color=(0.88, 0.9, 0.94), fill=(0.98, 0.99, 1.0), width=0.4)
-            pagina_auditoria.draw_line(fitz.Point(195, y_offset), fitz.Point(195, y_offset + alto_fila), color=(0.88, 0.9, 0.94), width=0.4)
-            pagina_auditoria.insert_text(fitz.Point(48, y_offset + 10.5), etiqueta, fontsize=5.8, color=(0.25, 0.3, 0.4))
-            pagina_auditoria.insert_text(fitz.Point(202, y_offset + 10.5), str(valor)[:86], fontsize=5.8, color=(0.06, 0.09, 0.16))
-            y_offset += alto_fila
+    y_offset = 104
+    alto_fila = 15.5
+    
+    for etiqueta, valor in filas_auditoria:
+        pagina_auditoria.draw_rect(fitz.Rect(42, y_offset, 553, y_offset + alto_fila), color=(0.88, 0.9, 0.94), fill=(0.98, 0.99, 1.0), width=0.4)
+        pagina_auditoria.draw_line(fitz.Point(195, y_offset), fitz.Point(195, y_offset + alto_fila), color=(0.88, 0.9, 0.94), width=0.4)
+        pagina_auditoria.insert_text(fitz.Point(48, y_offset + 10.5), etiqueta, fontsize=5.8, color=(0.25, 0.3, 0.4))
+        pagina_auditoria.insert_text(fitz.Point(202, y_offset + 10.5), str(valor)[:86], fontsize=5.8, color=(0.06, 0.09, 0.16))
+        y_offset += alto_fila
 
-        alto_bloque_qr = 46
-        rect_bloque_qr = fitz.Rect(42, y_offset + 4, 553, y_offset + 4 + alto_bloque_qr)
-        pagina_auditoria.draw_rect(rect_bloque_qr, color=color_azul_corp, fill=(0.98, 0.99, 1.0), width=0.6)
+    alto_bloque_qr = 46
+    rect_bloque_qr = fitz.Rect(42, y_offset + 4, 553, y_offset + 4 + alto_bloque_qr)
+    pagina_auditoria.draw_rect(rect_bloque_qr, color=color_azul_corp, fill=(0.98, 0.99, 1.0), width=0.6)
 
-        qr_auditoria_bytes = generar_qr_bytes(pkcs7_qr_url)
-        rect_qr_img = fitz.Rect(50, y_offset + 8, 88, y_offset + 46)
-        pagina_auditoria.insert_image(rect_qr_img, stream=qr_auditoria_bytes)
+    qr_auditoria_bytes = generar_qr_bytes(pkcs7_qr_url)
+    rect_qr_img = fitz.Rect(50, y_offset + 8, 88, y_offset + 46)
+    pagina_auditoria.insert_image(rect_qr_img, stream=qr_auditoria_bytes)
 
-        x_texto_qr = 96
-        pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 18), "VALIDACIÓN Y CONSULTA PÚBLICA DE INTEGRIDAD (PKCS#7 / SHA-256)", fontsize=6.8, fontname="helv", color=color_azul_corp)
-        pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 28), f"Valor del Código / Hash: {pkcs7_hash_real}", fontsize=5.6, fontname="courier", color=(0.1, 0.15, 0.25))
-        pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 38), f"Enlace de Consulta: {pkcs7_qr_url}", fontsize=5.6, fontname="courier", color=(0.2, 0.4, 0.8))
+    x_texto_qr = 96
+    pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 18), "VALIDACIÓN Y CONSULTA PÚBLICA DE INTEGRIDAD (PKCS#7 / SHA-256)", fontsize=6.8, fontname="helv", color=color_azul_corp)
+    pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 28), f"Valor del Código / Hash: {pkcs7_hash_real}", fontsize=5.6, fontname="courier", color=(0.1, 0.15, 0.25))
+    pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 38), f"Enlace de Consulta: {pkcs7_qr_url}", fontsize=5.6, fontname="courier", color=(0.2, 0.4, 0.8))
 
-        y_offset += alto_bloque_qr + 8
-        rect_fila_aviso = fitz.Rect(42, y_offset, 553, y_offset + 32)
-        pagina_auditoria.draw_rect(rect_fila_aviso, color=(0.75, 0.83, 0.95), fill=(0.95, 0.97, 1.0), width=0.6)
-        pagina_auditoria.insert_text(fitz.Point(76, y_offset + 12), "• Privacidad: La direccion IP y las coordenadas GPS se presentan enmascaradas para proteger la confidencialidad.", fontsize=5.8, color=(0.18, 0.23, 0.32))
-        pagina_auditoria.insert_text(fitz.Point(76, y_offset + 23), "• Respaldo legal: Los registros originales permanecen custodiados bajo estandares de seguridad en Celerdoc.", fontsize=5.8, color=(0.18, 0.23, 0.32))
+    y_offset += alto_bloque_qr + 8
+    rect_fila_aviso = fitz.Rect(42, y_offset, 553, y_offset + 32)
+    pagina_auditoria.draw_rect(rect_fila_aviso, color=(0.75, 0.83, 0.95), fill=(0.95, 0.97, 1.0), width=0.6)
+    pagina_auditoria.insert_text(fitz.Point(76, y_offset + 12), "• Privacidad: La direccion IP y las coordenadas GPS se presentan enmascaradas para proteger la confidencialidad.", fontsize=5.8, color=(0.18, 0.23, 0.32))
+    pagina_auditoria.insert_text(fitz.Point(76, y_offset + 23), "• Respaldo legal: Los registros originales permanecen custodiados bajo estandares de seguridad en Celerdoc.", fontsize=5.8, color=(0.18, 0.23, 0.32))
 
-        pagina_auditoria.draw_line(fitz.Point(42, 792), fitz.Point(553, 792), color=color_azul_corp, width=0.6)
-        pagina_auditoria.insert_text(fitz.Point(42, 804), f"Certificado expedido por Celerdoc | Hash Final: {sha256_final_certificado[:32]}...", fontsize=6, color=(0.4, 0.45, 0.5))
+    pagina_auditoria.draw_line(fitz.Point(42, 792), fitz.Point(553, 792), color=color_azul_corp, width=0.6)
+    pagina_auditoria.insert_text(fitz.Point(42, 804), f"Certificado expedido por Celerdoc | Hash Final: {sha256_final_certificado[:32]}...", fontsize=6, color=(0.4, 0.45, 0.5))
 
-        ruta_salida_pdf = os.path.join(OUTPUT_DIR, nombre_final)
-        doc.save(ruta_salida_pdf)
-        doc.close()
+    ruta_salida_pdf = os.path.join(OUTPUT_DIR, nombre_final)
+    doc.save(ruta_salida_pdf)
+    doc.close()
 
-        guardar_registro_auditoria({
-            "hash_pkcs7_corto": hash_corto,
-            "sig": hash_corto,
-            "nombre_doc_orig": nombre_original_limpio,
-            "sha256_original": sha256_original,
-            "fecha_carga_utc": ts_carga,
-            "nombre_doc_final": nombre_final,
-            "sha256_final": sha256_final_certificado,
-            "sha256_con_firma": sha256_final_certificado,
-            "fecha_sellado_utc": timestamp_sellado_utc,
-            "pkcs7_serial": pkcs7_serial,
-            "pkcs7_hash_real": pkcs7_hash_real,
-            "reporte_id_unico": reporte_id_unico,
-            "firmante_registrado": firmante_completo,
-            "nombre_firmante": firmante_completo,
-            "total_paginas_certificadas": total_pags_cert
-        })
-    except Exception:
-        traceback.print_exc()
+    guardar_registro_auditoria({
+        "hash_pkcs7_corto": hash_corto,
+        "sig": hash_corto,
+        "nombre_doc_orig": nombre_original_limpio,
+        "sha256_original": sha256_original,
+        "fecha_carga_utc": ts_carga,
+        "nombre_doc_final": nombre_final,
+        "sha256_final": sha256_final_certificado,
+        "sha256_con_firma": sha256_final_certificado,
+        "fecha_sellado_utc": timestamp_sellado_utc,
+        "pkcs7_serial": pkcs7_serial,
+        "pkcs7_hash_real": pkcs7_hash_real,
+        "reporte_id_unico": reporte_id_unico,
+        "firmante_registrado": firmante_completo,
+        "nombre_firmante": firmante_completo,
+        "total_paginas_certificadas": total_pags_cert
+    })
 
 
 class FirmaPayload(BaseModel):
@@ -610,7 +619,7 @@ class FirmaPayload(BaseModel):
 
 
 @app.post("/procesar-firma")
-async def procesar_firma(payload: FirmaPayload, request: Request, background_tasks: BackgroundTasks):
+async def procesar_firma(payload: FirmaPayload, request: Request):
     try:
         pdf_bytes = base64.b64decode(payload.archivo_base64)
         sha256_original = hashlib.sha256(pdf_bytes).hexdigest()
@@ -648,31 +657,12 @@ async def procesar_firma(payload: FirmaPayload, request: Request, background_tas
         ts_terms = payload.timestamp_terminos or timestamp_sellado_utc
         ts_trazo = payload.timestamp_trazo or timestamp_sellado_utc
         ts_otp = payload.timestamp_otp or timestamp_sellado_utc
-        total_pags_cert = f"{payload.total_paginas_con_extras + 1} paginas (incluye hoja de auditoria)"
 
         pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={hash_corto}"
 
         client_ip = request.client.host if request.client else "186.84.92.145"
         ip_enmascarada = enmascarar_ip(client_ip)
         gps_enmascarado = enmascarar_gps(payload.latitud_raw, payload.longitud_raw)
-
-        guardar_registro_auditoria({
-            "hash_pkcs7_corto": hash_corto,
-            "sig": hash_corto,
-            "nombre_doc_orig": nombre_original_limpio,
-            "sha256_original": sha256_original,
-            "fecha_carga_utc": ts_carga,
-            "nombre_doc_final": nombre_final,
-            "sha256_final": sha256_final_certificado,
-            "sha256_con_firma": sha256_final_certificado,
-            "fecha_sellado_utc": timestamp_sellado_utc,
-            "pkcs7_serial": pkcs7_serial,
-            "pkcs7_hash_real": pkcs7_hash_real,
-            "reporte_id_unico": reporte_id_unico,
-            "firmante_registrado": firmante_completo,
-            "nombre_firmante": firmante_completo,
-            "total_paginas_certificadas": total_pags_cert
-        })
 
         pkcs7_info_final = {
             "posicion_final": payload.pkcs7_info.get("posicion_final", "left_vertical") if payload.pkcs7_info else "left_vertical",
@@ -681,8 +671,8 @@ async def procesar_firma(payload: FirmaPayload, request: Request, background_tas
             "qr_data": pkcs7_qr_url
         }
 
-        background_tasks.add_task(
-            ejecutar_sellado_y_auditoria_fondo,
+        # Generación síncrona: garantiza que el archivo existe en disco antes de devolver la respuesta
+        generar_pdf_firmado_y_guardar(
             pdf_bytes,
             payload.total_paginas_con_extras,
             payload.pagina_seleccionada,
