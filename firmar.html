@@ -158,9 +158,9 @@
       gap: 7px;
       box-shadow: 0 3px 8px rgba(51, 102, 204, 0.25);
       letter-spacing: 0.2px;
+      pointer-events: none;
     }
-    .dropzone-subtitle-guide { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-top: 2px; }
-    .dropzone-disabled { opacity: 0.5; pointer-events: none; cursor: not-allowed; }
+    .dropzone-subtitle-guide { font-size: 12px; color: var(--text-muted); font-weight: 400; margin-top: 2px; pointer-events: none; }
     input[type="file"] { display: none; }
 
     @keyframes fadeInOutModal {
@@ -192,20 +192,6 @@
     }
     .toast-success-modal .hash-text { font-family: monospace; font-size: 11.5px; color: #15803d; word-break: break-all; }
 
-    .throttle-banner {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #1e40af;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      margin-bottom: 12px;
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-    }
-
     .nav-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; display: none; flex-wrap: wrap; gap: 10px; background: var(--bg-subtle); border: 1px solid var(--border-subtle); padding: 10px 14px; border-radius: 8px; }
     .toolbar-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .ux-btn { background: var(--bg-card); border: 1px solid var(--border-input); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease; }
@@ -213,7 +199,7 @@
     .ux-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .divider { width: 1px; height: 24px; background: var(--border-input); margin: 0 4px; }
     .page-indicator { font-size: 12.5px; font-weight: 500; color: var(--text-label); display: flex; align-items: center; gap: 6px; background: var(--bg-card); padding: 4px 10px; border: 1px solid var(--border-input); border-radius: 6px; }
-    .pdf-page-input { width: 40px; text-align: center; background: var(--bg-input); border: 1px solid var(--border-input); color: var(--brand-primary); border-radius: 4px; padding: 2px; font-size: 12px; outline: none; font-weight: 600; }
+    .pdf-page-input { width: 50px; text-align: center; background: var(--bg-input); border: 1px solid var(--border-input); color: var(--brand-primary); border-radius: 4px; padding: 2px; font-size: 12px; outline: none; font-weight: 600; }
     .btn-download-reader { background: var(--brand-primary); color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; display: none; align-items: center; gap: 6px; }
     .btn-download-reader:hover { background: var(--brand-primary-hover); }
 
@@ -377,7 +363,6 @@
     #canvasFullscreenPad { width: 100%; height: 100%; display: block; border-radius: 6px; }
     .pad-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; color: #94a3b8; pointer-events: none; font-weight: 400; }
 
-    /* ESTILO PREMIUM PARA CARGA DE IMAGEN DE FIRMA */
     .image-drop-zone {
       width: 100%;
       height: 210px;
@@ -543,23 +528,18 @@
       <label for="chkTerms" id="lblTerms">Acepto los Términos, Condiciones y Política de Privacidad de Celerdoc.</label>
     </div>
 
-    <div class="dropzone-container" id="dropArea" onclick="document.getElementById('fileInput').click()">
+    <div class="dropzone-container" id="dropArea">
       <div class="dropzone-action-btn">
         <span>📂</span>
         <span id="txtBtnAccion">Insertar documento para firmar</span>
       </div>
       <div class="dropzone-subtitle-guide" id="txtDropSubtitle">Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF</div>
-      <input type="file" id="fileInput" accept="application/pdf">
+      <input type="file" id="fileInput" accept="application/pdf,.pdf">
     </div>
 
     <div class="toast-success-modal" id="toastUploadModal">
       <div>📄 <span id="toastFileName">Documento</span> cargado exitosamente.</div>
       <div class="hash-text">SHA-256: <span id="toastFileHash">-</span></div>
-    </div>
-
-    <div class="throttle-banner" id="throttleBanner">
-      <span id="throttleText">⏱️ Freno de seguridad activo: esperando 2 segundos para consolidar nueva página...</span>
-      <strong id="throttleCountdown">2s</strong>
     </div>
 
     <div class="nav-bar" id="navBar">
@@ -582,10 +562,6 @@
 
     <div class="viewer-box" id="boxViewer">
       <div class="pages-cascade-container" id="pagesCascadeContainer">
-        <div class="canvas-page-wrapper" id="wrapperPrev">
-          <div class="page-label-badge" id="badgePrev">Anterior</div>
-          <canvas id="canvasPrev"></canvas>
-        </div>
         <div class="canvas-page-wrapper" id="wrapperActive">
           <div class="page-label-badge" id="badgeActive">Activa / Documento Original</div>
           <canvas id="canvasEspejo"></canvas>
@@ -660,7 +636,7 @@
         <div class="otp-error-msg" id="otpErrorMsg"></div>
         <div class="modal-buttons">
           <button type="button" class="btn-action-modal" id="btnConfirmarOtpManual">Confirmar Código</button>
-          <button type="button" class="btn-secondary" id="btnCancelarOtp">Cancelar</button>
+          <button type="button" class="btn-secondary" id="btnCancelarOtpModal">Cancelar</button>
         </div>
       </div>
     </div>
@@ -670,7 +646,7 @@
       <div class="success-subtitle" id="txtSuccessSubtitle">La estampa corporativa y la hoja de auditoría y trazabilidad han sido incorporadas al PDF certificado.</div>
 
       <div class="download-countdown-box" id="downloadCountdownBox">
-        Preparando su descarga segura... Disponible en <span id="downloadTimerSec">5</span>s
+        Preparando su descarga segura...
       </div>
 
       <div>
@@ -692,12 +668,6 @@
     let timestampAceptacionTermsUtc = "";
     let timestampOtpValidadoUtc = "";
     let timestampTrazoFirmaUtc = "";
-
-    function generarHashUnicoTransaccion() {
-      const randomValues = new Uint8Array(32);
-      crypto.getRandomValues(randomValues);
-      return Array.from(randomValues).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
 
     const catalogoPaises = [
       { codigo: "CO", nombre: "Colombia", indicativo: "+57", bandera: "🇨🇴", lang: "es" },
@@ -761,7 +731,6 @@
         pageText: "Pág",
         ofText: "de",
         downloadReader: "📥 Descargar documento original",
-        badgePrev: "Página Anterior",
         badgeActive: "Página Activa / Documento Original",
         docs: [
           { val: "CC", text: "CC - Cédula de Ciudadanía / DNI" },
@@ -798,7 +767,6 @@
         pageText: "Page",
         ofText: "of",
         downloadReader: "📥 Download original document",
-        badgePrev: "Previous Page",
         badgeActive: "Active / Original Document Page",
         docs: [
           { val: "CC", text: "CC - National ID / DNI" },
@@ -841,11 +809,8 @@
     const wrapTerms = document.getElementById('wrapTerms');
 
     chkTerms.checked = false;
-
     chkTerms.addEventListener('change', () => {
-      if (chkTerms.checked) {
-        wrapTerms.classList.remove('highlight-terms-error');
-      }
+      if (chkTerms.checked) wrapTerms.classList.remove('highlight-terms-error');
     });
 
     const errNombre = document.getElementById('errNombre');
@@ -904,21 +869,14 @@
 
     function enfocarYResaltar(elemento, esContenedor = false) {
       elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      if (!esContenedor) {
-        elemento.focus();
-      }
+      if (!esContenedor) elemento.focus();
     }
 
     function validarFormularioCompleto() {
-      const v1 = validarCampoNombre();
-      const v2 = validarCampoNumDoc();
-      const v3 = validarCampoEmail();
-      const v4 = validarCampoPhone();
-
-      if (!v1) { enfocarYResaltar(inputNombre); return false; }
-      if (!v2) { enfocarYResaltar(inputNumDoc); return false; }
-      if (!v3) { enfocarYResaltar(inputEmail); return false; }
-      if (!v4) { enfocarYResaltar(inputPhone); return false; }
+      if (!validarCampoNombre()) { enfocarYResaltar(inputNombre); return false; }
+      if (!validarCampoNumDoc()) { enfocarYResaltar(inputNumDoc); return false; }
+      if (!validarCampoEmail()) { enfocarYResaltar(inputEmail); return false; }
+      if (!validarCampoPhone()) { enfocarYResaltar(inputPhone); return false; }
 
       if (!chkTerms.checked) {
         wrapTerms.classList.add('highlight-terms-error');
@@ -928,7 +886,6 @@
       } else {
         wrapTerms.classList.remove('highlight-terms-error');
       }
-
       return true;
     }
 
@@ -950,9 +907,7 @@
       countryDropdown.classList.toggle('open');
     });
 
-    document.addEventListener('click', () => {
-      countryDropdown.classList.remove('open');
-    });
+    document.addEventListener('click', () => { countryDropdown.classList.remove('open'); });
 
     btnShowAllCountries.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -971,7 +926,6 @@
     function renderSelectorPaises() {
       listSuggested.innerHTML = '';
       listAllCountries.innerHTML = '';
-
       const sugeridos = catalogoPaises.filter(p => p.lang === idiomaActivo).slice(0, 20);
       const otros = catalogoPaises.filter(p => !sugeridos.includes(p));
 
@@ -1010,7 +964,6 @@
         document.getElementById('txtDropSubtitle').textContent = t.dropSubtitle;
       }
       document.getElementById('txtOtpTitulo').textContent = t.otpTitulo;
-      document.getElementById('btnCancelarOtp').textContent = t.btnCancelarOtp;
       document.getElementById('btnDescargar').textContent = t.btnDescargar;
       document.getElementById('titleSugeridos').textContent = t.sugeridosTitulo;
       btnShowAllCountries.textContent = t.verTodos;
@@ -1024,7 +977,6 @@
       document.getElementById('lblPageText').textContent = t.pageText;
       document.getElementById('lblOfText').textContent = t.ofText;
       document.getElementById('btnDescargarLectura').textContent = t.downloadReader;
-      document.getElementById('badgePrev').textContent = t.badgePrev;
       document.getElementById('badgeActive').textContent = t.badgeActive;
 
       const selDoc = document.getElementById('tipoDoc');
@@ -1037,7 +989,6 @@
         selDoc.appendChild(opt);
       });
       selDoc.value = valPrevio;
-
       renderSelectorPaises();
     }
 
@@ -1056,7 +1007,6 @@
       const countryCode = locale.includes('-') ? locale.split('-')[1].toUpperCase() : '';
 
       paisNativoDetectado = catalogoPaises.find(p => p.codigo === countryCode) || catalogoPaises.find(p => p.lang === langCode) || catalogoPaises[0];
-      
       document.getElementById('btnNativeCountry').textContent = `${paisNativoDetectado.bandera} ${paisNativoDetectado.nombre}`;
       
       const idiomaFinal = (textosIdiomas[langCode]) ? langCode : 'en';
@@ -1069,10 +1019,6 @@
     let base64String = '';
     let blobOriginalUrl = '';
     let paginasExtraEnBlanco = 0;
-    
-    let throttleTimerActive = false;
-    let throttleTimeoutId = null;
-    let countdownIntervalId = null;
 
     let datosTrazabilidad = {
       nombre_archivo: '',
@@ -1084,30 +1030,24 @@
       trazo_firma_png: '',
       pkcs7_aplicado: {
         posicion_final: 'left_vertical',
-        hash: generarHashUnicoTransaccion(),
+        hash: '',
         algoritmo: 'SHA256withRSA / PKCS#7 Container',
-        qr_data: `${API_URL}/validar`,
+        qr_data: '',
         status: 'VALID'
       }
     };
     let descargaUrlActual = '';
-    let nombreArchivoFinalGlobal = '';
 
     const dropArea = document.getElementById('dropArea');
     const fileInput = document.getElementById('fileInput');
     const toastUploadModal = document.getElementById('toastUploadModal');
     const toastFileName = document.getElementById('toastFileName');
     const toastFileHash = document.getElementById('toastFileHash');
-    const throttleBanner = document.getElementById('throttleBanner');
-    const throttleCountdown = document.getElementById('throttleCountdown');
     const navBar = document.getElementById('navBar');
     const boxViewer = document.getElementById('boxViewer');
     
     const canvasActive = document.getElementById('canvasEspejo');
     const ctxActive = canvasActive.getContext('2d');
-    const canvasPrev = document.getElementById('canvasPrev');
-    const ctxPrev = canvasPrev.getContext('2d');
-    const wrapperPrev = document.getElementById('wrapperPrev');
 
     const floatingSignGroup = document.getElementById('floatingSignGroup');
     const markerFirma = document.getElementById('markerFirma');
@@ -1138,8 +1078,10 @@
     
     let isDrawingFullscreen = false;
     let haCompletadoTrazo = false;
-    let modalidadFirmaActiva = 'trazo'; // 'trazo' | 'imagen'
+    let modalidadFirmaActiva = 'trazo';
     let imagenFirmaCargadaBase64 = '';
+
+    dropArea.addEventListener('click', () => { fileInput.click(); });
 
     tabBtnDibujar.addEventListener('click', () => {
       modalidadFirmaActiva = 'trazo';
@@ -1185,7 +1127,7 @@
     const inputOtp = document.getElementById('inputOtp');
     const otpErrorMsg = document.getElementById('otpErrorMsg');
     const btnConfirmarOtpManual = document.getElementById('btnConfirmarOtpManual');
-    const btnCancelarOtp = document.getElementById('btnCancelarOtp');
+    const btnCancelarOtpModal = document.getElementById('btnCancelarOtpModal');
     const successPanel = document.getElementById('successPanel');
     const btnDescargar = document.getElementById('btnDescargar');
     const btnDescargarLectura = document.getElementById('btnDescargarLectura');
@@ -1246,7 +1188,6 @@
     canvasFullscreenPad.addEventListener('mousedown', empezarDibujoFullscreen);
     canvasFullscreenPad.addEventListener('mousemove', trazarFullscreen);
     window.addEventListener('mouseup', terminarDibujoFullscreen);
-
     canvasFullscreenPad.addEventListener('touchstart', empezarDibujoFullscreen, { passive: false });
     canvasFullscreenPad.addEventListener('touchmove', trazarFullscreen, { passive: false });
     window.addEventListener('touchend', terminarDibujoFullscreen);
@@ -1315,7 +1256,6 @@
       setTimeout(() => inputOtp.focus(), 100);
     });
 
-    // LÓGICA OTP CON AUTO-CONFIRMACIÓN AL LLEGAR AL 6º DÍGITO
     function verificarYEjecutarOtp() {
       const codigo = inputOtp.value.trim();
       if (codigo.length === 6) {
@@ -1341,9 +1281,7 @@
 
     inputOtp.addEventListener('input', () => {
       inputOtp.value = inputOtp.value.replace(/\D/g, '');
-      if (inputOtp.value.length === 6) {
-        verificarYEjecutarOtp();
-      }
+      if (inputOtp.value.length === 6) verificarYEjecutarOtp();
     });
 
     btnConfirmarOtpManual.addEventListener('click', (e) => {
@@ -1351,11 +1289,7 @@
       verificarYEjecutarOtp();
     });
 
-    btnarCancelarOtp = document.getElementById('btnarCancelarOtp');
-    if (btnarCancelarOtp) {
-      btnarCancelarOtp.addEventListener('click', () => { modalOtp.style.display = 'none'; });
-    }
-    btnCancelarOtp.addEventListener('click', () => { modalOtp.style.display = 'none'; });
+    btnCancelarOtpModal.addEventListener('click', () => { modalOtp.style.display = 'none'; });
 
     function renderizarEstampaPKCS7() {
       const contenedor = document.getElementById('wrapperActive');
@@ -1372,7 +1306,7 @@
         <div class="pkcs7-qr-slot" id="slotQrPkcs7"></div>
         <div class="pkcs7-data-text">
           <strong style="color: #3366CC;">PKCS#7 VALIDATION:</strong>
-          <span class="pkcs7-hash-val">${pkcs.hash}</span>
+          <span class="pkcs7-hash-val">${pkcs.hash.substring(0, 24)}...</span>
           <span style="color: #16a34a; font-weight: bold;">[${pkcs.status}]</span>
         </div>
       `;
@@ -1398,12 +1332,16 @@
     }
 
     async function procesarArchivoPDF(archivo) {
-      if (!archivo || (archivo.type && archivo.type !== 'application/pdf')) {
-        alert("Por favor seleccione o pegue un archivo PDF válido.");
+      if (!archivo) return;
+      const nombreArchivo = archivo.name || "documento.pdf";
+      const esPdf = nombreArchivo.toLowerCase().endsWith('.pdf') || (archivo.type && archivo.type.includes('pdf'));
+      
+      if (!esPdf) {
+        alert("Por favor seleccione un archivo PDF válido.");
         return;
       }
 
-      datosTrazabilidad.nombre_archivo = archivo.name || "documento.pdf";
+      datosTrazabilidad.nombre_archivo = nombreArchivo;
       timestampCargaDocUtc = new Date().toISOString();
       datosTrazabilidad.timestamp_utc = timestampCargaDocUtc;
       
@@ -1412,7 +1350,6 @@
 
       blobOriginalUrl = URL.createObjectURL(archivo);
       paginasExtraEnBlanco = 0;
-      throttleTimerActive = false;
 
       const arrayBuffer = await archivo.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
@@ -1426,9 +1363,9 @@
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       datosTrazabilidad.sha256_original = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      const uniqueHash = generarHashUnicoTransaccion();
-      datosTrazabilidad.pkcs7_aplicado.hash = uniqueHash;
-      datosTrazabilidad.pkcs7_aplicado.qr_data = `${API_URL}/validar?sig=${uniqueHash.substring(0, 32)}`;
+      const hashSincronizado = datosTrazabilidad.sha256_original.substring(0, 32);
+      datosTrazabilidad.pkcs7_aplicado.hash = datosTrazabilidad.sha256_original;
+      datosTrazabilidad.pkcs7_aplicado.qr_data = `${API_URL}/validar?sig=${hashSincronizado}`;
 
       pdfActual = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       datosTrazabilidad.total_paginas = pdfActual.numPages;
@@ -1436,9 +1373,7 @@
       toastFileName.textContent = datosTrazabilidad.nombre_archivo;
       toastFileHash.textContent = datosTrazabilidad.sha256_original;
       toastUploadModal.style.display = 'flex';
-      setTimeout(() => {
-        toastUploadModal.style.display = 'none';
-      }, 4500);
+      setTimeout(() => { toastUploadModal.style.display = 'none'; }, 4500);
 
       lblTotalPagsToolbar.textContent = pdfActual.numPages;
       inputNumPag.max = pdfActual.numPages;
@@ -1452,22 +1387,22 @@
         btnDescargarLectura.style.display = 'none';
       }
 
-      irAPagina(pdfActual.numPages);
+      irAPagina(1);
     }
 
     fileInput.addEventListener('change', (e) => {
-      if (e.target.files && e.target.files[0]) procesarArchivoPDF(e.target.files[0]);
+      if (e.target.files && e.target.files[0]) {
+        procesarArchivoPDF(e.target.files[0]);
+        e.target.value = '';
+      }
     });
 
-    ['dragenter', 'dragover'].forEach(eventName => {
-      dropArea.addEventListener(eventName, (e) => { e.preventDefault(); });
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
       dropArea.addEventListener(eventName, (e) => { e.preventDefault(); });
     });
 
     dropArea.addEventListener('drop', (e) => {
+      e.preventDefault();
       const files = e.dataTransfer.files;
       if (files.length > 0) procesarArchivoPDF(files[0]);
     });
@@ -1476,8 +1411,7 @@
       const items = (e.clipboardData || window.clipboardData).items;
       for (let i = 0; i < items.length; i++) {
         if (items[i].kind === 'file') {
-          const blob = items[i].getAsFile();
-          procesarArchivoPDF(blob);
+          procesarArchivoPDF(items[i].getAsFile());
           break;
         }
       }
@@ -1494,18 +1428,31 @@
     }
 
     async function renderizarVisualizadorCascade(numPagina) {
-      const pageAct = await pdfActual.getPage(numPagina > pdfActual.numPages ? pdfActual.numPages : numPagina);
-      const vpAct = pageAct.getViewport({ scale: escalaActual });
-      canvasActive.width = vpAct.width;
-      canvasActive.height = vpAct.height;
-      await pageAct.render({ canvasContext: ctxActive, viewport: vpAct }).promise;
+      const totalOriginales = pdfActual.numPages;
+      if (numPagina <= totalOriginales) {
+        const pageAct = await pdfActual.getPage(numPagina);
+        const vpAct = pageAct.getViewport({ scale: escalaActual });
+        canvasActive.width = vpAct.width;
+        canvasActive.height = vpAct.height;
+        await pageAct.render({ canvasContext: ctxActive, viewport: vpAct }).promise;
+        document.getElementById('badgeActive').textContent = `Activa (Página ${numPagina} de ${totalOriginales})`;
+      } else {
+        canvasActive.width = 595 * escalaActual;
+        canvasActive.height = 842 * escalaActual;
+        ctxActive.fillStyle = "#ffffff";
+        ctxActive.fillRect(0, 0, canvasActive.width, canvasActive.height);
+        ctxActive.fillStyle = "#64748b";
+        ctxActive.font = `${14 * escalaActual}px sans-serif`;
+        ctxActive.textAlign = "center";
+        ctxActive.fillText("Página Adicional de Cierre y Firma", canvasActive.width / 2, canvasActive.height / 2);
+        document.getElementById('badgeActive').textContent = `Página Adicional de Cierre`;
+      }
 
       if (!datosTrazabilidad.coordenadas.x_pct) {
         const defaultX = canvasActive.width / 2;
         const defaultY = canvasActive.height - 85;
         floatingSignGroup.style.left = `${defaultX}px`;
         floatingSignGroup.style.top = `${defaultY}px`;
-        floatingSignGroup.style.display = 'flex';
         datosTrazabilidad.coordenadas = {
           x_pct: parseFloat(((defaultX / canvasActive.width) * 100).toFixed(2)),
           y_pct: parseFloat(((defaultY / canvasActive.height) * 100).toFixed(2))
@@ -1541,12 +1488,59 @@
         const rect = canvasActive.getBoundingClientRect();
         let x = e.clientX - rect.left;
         let y = e.clientY - rect.top;
-        floatingSignGroup.style.left = `${x}px`;
-        floatingSignGroup.style.top = `${y}px`;
-        datosTrazabilidad.coordenadas = {
-          x_pct: parseFloat(((x / rect.width) * 100).toFixed(2)),
-          y_pct: parseFloat(((y / rect.height) * 100).toFixed(2))
-        };
+
+        // FORZAR CREACIÓN AUTOMÁTICA DE HOJA ANEXA AL LLEGAR ABAJO EN LA ÚLTIMA PÁGINA
+        if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages && paginasExtraEnBlanco === 0 && y > rect.height - 25) {
+          isDraggingMarker = false;
+          paginasExtraEnBlanco = 1;
+          lblTotalPagsToolbar.textContent = pdfActual.numPages + 1;
+          inputNumPag.max = pdfActual.numPages + 1;
+          datosTrazabilidad.pagina_activa = pdfActual.numPages + 1;
+          inputNumPag.value = datosTrazabilidad.pagina_activa;
+          
+          renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa).then(() => {
+            const targetX = Math.max(40, Math.min(canvasActive.width - 40, x));
+            const targetY = 80;
+            floatingSignGroup.style.left = `${targetX}px`;
+            floatingSignGroup.style.top = `${targetY}px`;
+            datosTrazabilidad.coordenadas = {
+              x_pct: parseFloat(((targetX / canvasActive.width) * 100).toFixed(2)),
+              y_pct: parseFloat(((targetY / canvasActive.height) * 100).toFixed(2))
+            };
+          });
+          return;
+        }
+
+        // DEVOLVER Y ELIMINAR HOJA ANEXA SI LA SUBE AL TOPE SUPERIOR
+        if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages + 1 && paginasExtraEnBlanco === 1 && y < 25) {
+          isDraggingMarker = false;
+          paginasExtraEnBlanco = 0;
+          lblTotalPagsToolbar.textContent = pdfActual.numPages;
+          inputNumPag.max = pdfActual.numPages;
+          datosTrazabilidad.pagina_activa = pdfActual.numPages;
+          inputNumPag.value = datosTrazabilidad.pagina_activa;
+          
+          renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa).then(() => {
+            const targetX = Math.max(40, Math.min(canvasActive.width - 40, x));
+            const targetY = canvasActive.height - 90;
+            floatingSignGroup.style.left = `${targetX}px`;
+            floatingSignGroup.style.top = `${targetY}px`;
+            datosTrazabilidad.coordenadas = {
+              x_pct: parseFloat(((targetX / canvasActive.width) * 100).toFixed(2)),
+              y_pct: parseFloat(((targetY / canvasActive.height) * 100).toFixed(2))
+            };
+          });
+          return;
+        }
+
+        if (y >= 0 && y <= rect.height && x >= 0 && x <= rect.width) {
+          floatingSignGroup.style.left = `${x}px`;
+          floatingSignGroup.style.top = `${y}px`;
+          datosTrazabilidad.coordenadas = {
+            x_pct: parseFloat(((x / rect.width) * 100).toFixed(2)),
+            y_pct: parseFloat(((y / rect.height) * 100).toFixed(2))
+          };
+        }
       } else if (isResizingMarker) {
         const diffX = e.clientX - startResizeX;
         const newW = Math.max(140, Math.min(320, startResizeW + diffX));
@@ -1559,6 +1553,35 @@
     window.addEventListener('mouseup', () => {
       isDraggingMarker = false;
       isResizingMarker = false;
+    });
+
+    inputNumPag.addEventListener('change', () => {
+      let val = parseInt(inputNumPag.value) || 1;
+      irAPagina(val);
+    });
+
+    btnZoomIn.addEventListener('click', () => {
+      escalaActual = Math.min(escalaActual + 0.2, 2.5);
+      renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
+    });
+
+    btnZoomOut.addEventListener('click', () => {
+      escalaActual = Math.max(escalaActual - 0.2, 0.6);
+      renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
+    });
+
+    btnZoom100.addEventListener('click', () => {
+      escalaActual = 1.2;
+      renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa);
+    });
+
+    btnPrimeraPag.addEventListener('click', () => irAPagina(1));
+    btnAntPag.addEventListener('click', () => irAPagina(datosTrazabilidad.pagina_activa - 1));
+    btnSigPag.addEventListener('click', () => irAPagina(datosTrazabilidad.pagina_activa + 1));
+    btnUltimaPag.addEventListener('click', () => irAPagina(pdfActual ? pdfActual.numPages + paginasExtraEnBlanco : 1));
+
+    btnDescargarLectura.addEventListener('click', () => {
+      if (blobOriginalUrl) window.open(blobOriginalUrl, '_blank');
     });
 
     btnFloatingSign.addEventListener('click', (e) => {

@@ -1,4 +1,4 @@
-Ôªøimport os
+import os
 import io
 import json
 import uuid
@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import pymupdf as fitz
 import qrcode
+from supabase import create_client, Client
 
 app = FastAPI(title="Celerdoc API")
 
@@ -31,7 +32,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "documentos_firmados")
 CONFIG_JSON_PATH = os.path.join(BASE_DIR, "estilos_firmas.json")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-DB_AUDITORIA_PATH = os.path.join(BASE_DIR, "auditoria_db.json")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -39,31 +39,60 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/descargas", StaticFiles(directory=OUTPUT_DIR), name="descargas")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# ==========================================
+# CONFIGURACI”N DE SUPABASE
+# ==========================================
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://nmibxvctzcdujglzovqc.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print("Cliente de Supabase inicializado correctamente.")
+except Exception as err_init:
+    print(f"Error al inicializar cliente Supabase: {err_init}")
+    supabase = None
+
 
 def guardar_registro_auditoria(registro: dict):
-    """Guarda los metadatos de validaci√≥n p√∫blica de forma persistente."""
+    """Guarda de forma persistente los metadatos de auditorÌa directamente en Supabase."""
+    if not supabase:
+        print("ADVERTENCIA: Cliente Supabase no disponible.")
+        return None
+
     try:
-        registros = {}
-        if os.path.exists(DB_AUDITORIA_PATH):
-            with open(DB_AUDITORIA_PATH, "r", encoding="utf-8") as f:
-                registros = json.load(f)
-        sig_key = registro.get("hash_pkcs7_corto", registro.get("sig", ""))
-        registros[sig_key] = registro
-        with open(DB_AUDITORIA_PATH, "w", encoding="utf-8") as f:
-            json.dump(registros, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+        if not registro.get("sig"):
+            registro["sig"] = registro.get("hash_pkcs7_corto") or registro.get("reporte_id_unico") or f"CELER-{uuid.uuid4().hex[:8]}"
+
+        if not registro.get("hash_pkcs7_corto"):
+            registro["hash_pkcs7_corto"] = registro["sig"]
+
+        if not registro.get("firmante_registrado") and registro.get("nombre_firmante"):
+            registro["firmante_registrado"] = registro["nombre_firmante"]
+
+        res = supabase.table("auditoria").upsert(registro, on_conflict="sig").execute()
+        print("°REGISTRO GUARDADO EN SUPABASE (UPSERT) CON …XITO!")
+        return res
+    except Exception as e:
+        print(f"ADVERTENCIA EN UPSERT SUPABASE, INTENTANDO INSERT DIRECTO: {e}")
+        try:
+            res = supabase.table("auditoria").insert(registro).execute()
+            print("°REGISTRO GUARDADO EN SUPABASE (INSERT) CON …XITO!")
+            return res
+        except Exception as e2:
+            print(f"ERROR AL GUARDAR EN SUPABASE: {e2}")
+            return None
 
 
 def consultar_registro_auditoria(sig: str) -> Optional[dict]:
-    """Recupera los metadatos de auditor√≠a asociados a un sello PKCS#7."""
+    """Recupera los metadatos de auditorÌa asociados a un sello PKCS#7 desde Supabase."""
+    if not supabase:
+        return None
     try:
-        if os.path.exists(DB_AUDITORIA_PATH):
-            with open(DB_AUDITORIA_PATH, "r", encoding="utf-8") as f:
-                registros = json.load(f)
-                return registros.get(sig)
-    except Exception:
-        pass
+        response = supabase.table("auditoria").select("*").eq("sig", sig).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+    except Exception as e:
+        print(f"Error al consultar en Supabase: {e}")
     return None
 
 
@@ -72,7 +101,7 @@ async def servir_firmar_html():
     ruta_html = os.path.join(BASE_DIR, "firmar.html")
     if os.path.exists(ruta_html):
         return FileResponse(ruta_html)
-    return {"mensaje": "Celerdoc API operativa. Coloque firmar.html en el directorio ra√≠z."}
+    return {"mensaje": "Celerdoc API operativa. Coloque firmar.html en el directorio raÌz."}
 
 
 @app.get("/validar", response_class=HTMLResponse)
@@ -80,7 +109,7 @@ async def validar_consulta_publica(
     request: Request,
     sig: Optional[str] = None
 ):
-    """P√°gina de Consulta P√∫blica sincronizada exactamente con la Hoja de Auditor√≠a."""
+    """P·gina de Consulta P˙blica sincronizada con los datos exactos de auditorÌa y Supabase."""
     ahora_consulta = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     sig_key = sig or "No especificado"
 
@@ -93,7 +122,7 @@ async def validar_consulta_publica(
     hash_sha_orig = datos_db.get("sha256_original", "No disponible")
     nombre_doc_fin = datos_db.get("nombre_doc_final", "documento_firmado_certificado.pdf")
     ts_fin = datos_db.get("fecha_sellado_utc", ahora_consulta)
-    total_paginas_txt = datos_db.get("total_paginas_certificadas", "P√°ginas originales + Hoja de auditor√≠a")
+    total_paginas_txt = datos_db.get("total_paginas_certificadas", "P·ginas originales + Hoja de auditorÌa")
     hash_sha_fin = datos_db.get("sha256_con_firma", datos_db.get("sha256_final", "No disponible"))
     std_pkcs7 = datos_db.get("pkcs7_serial", f"PKCS7-SHA256-{sig_key[:24].upper()}")
     hash_pkcs7_completo = datos_db.get("pkcs7_hash_real", sig_key)
@@ -104,11 +133,11 @@ async def validar_consulta_publica(
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Celerdoc ‚Äî Consulta P√∫blica de Integridad</title>
+        <title>Celerdoc ó Consulta P˙blica de Integridad y Trazabilidad</title>
         <style>
             * {{ box-sizing: border-box; }}
             body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px 16px; display: flex; justify-content: center; align-items: center; min-height: 95vh; color: #0f172a; }}
-            .card {{ background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); max-width: 620px; width: 100%; border-top: 5px solid #3366CC; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }}
+            .card {{ background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); max-width: 650px; width: 100%; border-top: 5px solid #3366CC; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }}
             .badge {{ display: inline-block; background-color: #dcfce7; color: #166534; font-weight: 700; padding: 6px 14px; border-radius: 9999px; font-size: 13px; margin-bottom: 14px; border: 1px solid #86efac; }}
             h2 {{ color: #0f172a; margin: 0 0 6px 0; font-size: 21px; }}
             p.sub {{ color: #64748b; font-size: 13px; margin: 0 0 20px 0; }}
@@ -124,51 +153,51 @@ async def validar_consulta_publica(
     <body>
         <div class="card">
             <button class="lang-switch" id="btnLang" onclick="alternarIdioma()">English</button>
-            <span class="badge" id="lblBadge">‚úì DOCUMENTO √çNTEGRO Y V√ÅLIDO</span>
-            <h2 id="lblTitulo">Verificaci√≥n de Integridad y Trazabilidad</h2>
-            <p class="sub" id="lblSub">Plataforma Celerdoc ‚Ä¢ Validaci√≥n Criptogr√°fica Oficial</p>
+            <span class="badge" id="lblBadge">? DOCUMENTO ÕNTEGRO Y V¡LIDO</span>
+            <h2 id="lblTitulo">VerificaciÛn de Integridad y Trazabilidad</h2>
+            <p class="sub" id="lblSub">Plataforma Celerdoc ï ValidaciÛn Criptogr·fica Oficial</p>
 
-            <div class="section-title" id="lblSec1">1. Identificaci√≥n del Reporte y Firmante</div>
+            <div class="section-title" id="lblSec1">1. IdentificaciÛn del Reporte y Firmante</div>
             <div class="data-row">
-                <span class="data-label" id="lblAuditId">Identificador de Reporte de Auditor√≠a:</span> <strong>{reporte_id}</strong><br>
+                <span class="data-label" id="lblAuditId">Identificador de Reporte de AuditorÌa:</span> <strong>{reporte_id}</strong><br>
                 <span class="data-label" id="lblSignerMask">Nombre y Apellidos del Firmante:</span> <span style="color:#1d4ed8; font-weight:700;">{firmante_registrado}</span>
             </div>
 
             <div class="section-title" id="lblSec2">2. Documento Original y Hash Inicial</div>
             <div class="data-row">
-                <span class="data-label" id="lblDocOrigName">Nombre del Documento Original:</span> {nombre_doc_orig}<br>
+                <span class="data-label" id="lblDocOrigName">Nombre del Documento Original:</span> <strong>{nombre_doc_orig}</strong><br>
                 <span class="data-label" id="lblDocOrigDate">Fecha de carga:</span> {ts_orig}
             </div>
             <div class="data-row">
-                <span class="data-label" id="lblHashOrig">C√≥digo Hash SHA-256 del Documento Original:</span>
+                <span class="data-label" id="lblHashOrig">CÛdigo Hash SHA-256 del Documento Original:</span>
                 <div class="hash-box">{hash_sha_orig}</div>
             </div>
 
             <div class="section-title" id="lblSec3">3. Documento Final Certificado y Hash Final</div>
             <div class="data-row">
-                <span class="data-label" id="lblDocFinName">Nombre del Documento Final:</span> {nombre_doc_fin}<br>
+                <span class="data-label" id="lblDocFinName">Nombre del Documento Final:</span> <strong>{nombre_doc_fin}</strong><br>
                 <span class="data-label" id="lblDocFinDate">Fecha de sellado UTC:</span> {ts_fin}<br>
-                <span class="data-label" id="lblTotalPages">Extensi√≥n certificada:</span> {total_paginas_txt}
+                <span class="data-label" id="lblTotalPages">ExtensiÛn certificada:</span> {total_paginas_txt}
             </div>
             <div class="data-row">
-                <span class="data-label" id="lblHashFin">C√≥digo Hash SHA-256 del Documento Final:</span>
+                <span class="data-label" id="lblHashFin">CÛdigo Hash SHA-256 del Documento Final:</span>
                 <div class="hash-box">{hash_sha_fin}</div>
             </div>
 
-            <div class="section-title" id="lblSec4">4. Contenedor y Est√°ndar PKCS #7</div>
+            <div class="section-title" id="lblSec4">4. Contenedor y Est·ndar PKCS #7</div>
             <div class="data-row">
-                <span class="data-label" id="lblPkcsSerial">N√∫mero Est√°ndar PKCS#7:</span> <strong>{std_pkcs7}</strong><br>
-                <span class="data-label" id="lblAlg">Algoritmo y Sellado:</span> SHA-256 / RSA 2048-bit ‚Ä¢ RFC 3161<br>
-                <span class="data-label" id="lblHashPkcs">Hash Criptogr√°fico PKCS#7:</span>
+                <span class="data-label" id="lblPkcsSerial">N˙mero Est·ndar PKCS#7:</span> <strong>{std_pkcs7}</strong><br>
+                <span class="data-label" id="lblAlg">Algoritmo y Sellado:</span> SHA-256 / RSA 2048-bit ï RFC 3161<br>
+                <span class="data-label" id="lblHashPkcs">Hash Criptogr·fico PKCS#7:</span>
                 <div class="hash-box">{hash_pkcs7_completo}</div>
             </div>
 
             <div class="info-legal" id="lblLegal">
-                <strong>Garant√≠a de Integridad:</strong> Este reporte valida que la firma y la trazabilidad cumplen con los est√°ndares de no repudio. Por pol√≠ticas de privacidad, la descarga directa del contenido permanece reservada al titular.
+                <strong>GarantÌa de Integridad:</strong> Este reporte valida que la firma y la trazabilidad cumplen con los est·ndares de no repudio. Por polÌticas de privacidad, la descarga directa del contenido permanece reservada al titular.
             </div>
 
             <div class="footer" id="lblFooter">
-                Celerdoc &copy; 2026 ‚Ä¢ Verificaci√≥n efectuada: {ahora_consulta}
+                Celerdoc &copy; 2026 ï VerificaciÛn efectuada: {ahora_consulta}
             </div>
         </div>
 
@@ -176,33 +205,33 @@ async def validar_consulta_publica(
             const i18n = {{
                 es: {{
                     btn: "English",
-                    badge: "‚úì DOCUMENTO √çNTEGRO Y V√ÅLIDO",
-                    titulo: "Verificaci√≥n de Integridad y Trazabilidad",
-                    sub: "Plataforma Celerdoc ‚Ä¢ Validaci√≥n Criptogr√°fica Oficial",
-                    sec1: "1. Identificaci√≥n del Reporte y Firmante",
-                    auditId: "Identificador de Reporte de Auditor√≠a:",
+                    badge: "? DOCUMENTO ÕNTEGRO Y V¡LIDO",
+                    titulo: "VerificaciÛn de Integridad y Trazabilidad",
+                    sub: "Plataforma Celerdoc ï ValidaciÛn Criptogr·fica Oficial",
+                    sec1: "1. IdentificaciÛn del Reporte y Firmante",
+                    auditId: "Identificador de Reporte de AuditorÌa:",
                     signerMask: "Nombre y Apellidos del Firmante:",
                     sec2: "2. Documento Original y Hash Inicial",
                     docOrigName: "Nombre del Documento Original:",
                     docOrigDate: "Fecha de carga:",
-                    hashOrig: "C√≥digo Hash SHA-256 del Documento Original:",
+                    hashOrig: "CÛdigo Hash SHA-256 del Documento Original:",
                     sec3: "3. Documento Final Certificado y Hash Final",
                     docFinName: "Nombre del Documento Final:",
                     docFinDate: "Fecha de sellado UTC:",
-                    totalPages: "Extensi√≥n certificada:",
-                    hashFin: "C√≥digo Hash SHA-256 del Documento Final:",
-                    sec4: "4. Contenedor y Est√°ndar PKCS #7",
-                    pkcsSerial: "N√∫mero Est√°ndar PKCS#7:",
+                    totalPages: "ExtensiÛn certificada:",
+                    hashFin: "CÛdigo Hash SHA-256 del Documento Final:",
+                    sec4: "4. Contenedor y Est·ndar PKCS #7",
+                    pkcsSerial: "N˙mero Est·ndar PKCS#7:",
                     alg: "Algoritmo y Sellado:",
-                    hashPkcs: "Hash Criptogr√°fico PKCS#7:",
-                    legal: "<strong>Garant√≠a de Integridad:</strong> Este reporte valida que la firma y la trazabilidad cumplen con los est√°ndares de no repudio. Por pol√≠ticas de privacidad, la descarga directa del contenido permanece reservada al titular.",
-                    footer: "Celerdoc &copy; 2026 ‚Ä¢ Verificaci√≥n efectuada: {ahora_consulta}"
+                    hashPkcs: "Hash Criptogr·fico PKCS#7:",
+                    legal: "<strong>GarantÌa de Integridad:</strong> Este reporte valida que la firma y la trazabilidad cumplen con los est·ndares de no repudio. Por polÌticas de privacidad, la descarga directa del contenido permanece reservada al titular.",
+                    footer: "Celerdoc &copy; 2026 ï VerificaciÛn efectuada: {ahora_consulta}"
                 }},
                 en: {{
-                    btn: "Espa√±ol",
-                    badge: "‚úì VALID & INTACT DOCUMENT",
+                    btn: "EspaÒol",
+                    badge: "? VALID & INTACT DOCUMENT",
                     titulo: "Integrity and Traceability Verification",
-                    sub: "Celerdoc Platform ‚Ä¢ Official Cryptographic Validation",
+                    sub: "Celerdoc Platform ï Official Cryptographic Validation",
                     sec1: "1. Audit Report & Signer Identification",
                     auditId: "Audit Report Identifier:",
                     signerMask: "Signer Full Name:",
@@ -220,7 +249,7 @@ async def validar_consulta_publica(
                     alg: "Algorithm & Stamping:",
                     hashPkcs: "PKCS#7 Cryptographic Hash:",
                     legal: "<strong>Integrity Guarantee:</strong> This report validates that the signature and audit trail meet non-repudiation standards. To guarantee privacy, direct download remains restricted to the owner.",
-                    footer: "Celerdoc &copy; 2026 ‚Ä¢ Verified on: {ahora_consulta}"
+                    footer: "Celerdoc &copy; 2026 ï Verified on: {ahora_consulta}"
                 }}
             }};
 
@@ -274,7 +303,7 @@ def hex_to_rgb(hex_str: str):
 
 
 def enmascarar_ip(ip: str) -> str:
-    """Enmascara la IP mostrando los primeros 2 segmentos y el √∫ltimo."""
+    """Enmascara la IP mostrando los primeros 2 segmentos y el ˙ltimo."""
     if not ip or ip in ("127.0.0.1", "localhost", "::1"):
         ip = "186.84.92.145"
     partes = ip.split('.')
@@ -284,7 +313,7 @@ def enmascarar_ip(ip: str) -> str:
 
 
 def enmascarar_gps(lat, lon) -> str:
-    """Formatea GPS con signo, 2 enteros y 4 decimales mostrando √∫nicamente los 2 √∫ltimos d√≠gitos."""
+    """Formatea GPS con signo, 2 enteros y 4 decimales mostrando ˙nicamente los 2 ˙ltimos dÌgitos."""
     def fmt(val):
         if val is None:
             return "+**.**00"
@@ -302,7 +331,7 @@ def enmascarar_gps(lat, lon) -> str:
 
 
 def cargar_configuracion_estilos():
-    """Carga la plantilla de dise√±o de firma desde estilos_firmas.json."""
+    """Carga la plantilla de diseÒo de firma desde estilos_firmas.json."""
     if os.path.exists(CONFIG_JSON_PATH):
         try:
             with open(CONFIG_JSON_PATH, "r", encoding="utf-8") as f:
@@ -321,7 +350,7 @@ def cargar_configuracion_estilos():
 
 
 def generar_qr_bytes(data_texto: str) -> bytes:
-    """Genera c√≥digo QR limpio, ampliado y f√°cil de leer para cualquier c√°mara m√≥vil."""
+    """Genera cÛdigo QR limpio, ampliado y f·cil de leer para cualquier c·mara mÛvil."""
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -371,7 +400,7 @@ def estampar_bloque_firma_json(pagina, rect_destino, nombre_titular, id_texto, v
 
 
 def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
-    """Inserta el sello PKCS #7 en la p√°gina del documento original."""
+    """Inserta el sello PKCS #7 en la p·gina del documento original."""
     if not pkcs7_info:
         return
 
@@ -432,7 +461,7 @@ def ejecutar_sellado_y_auditoria_fondo(
     whatsapp_notificacion: Optional[str],
     codigo_otp_validado: Optional[str]
 ):
-    """Tarea as√≠ncrona que procesa el sellado y genera la hoja de auditor√≠a."""
+    """Tarea asÌncrona que procesa el sellado y genera la hoja de auditorÌa."""
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
@@ -515,15 +544,15 @@ def ejecutar_sellado_y_auditoria_fondo(
         pagina_auditoria.insert_image(rect_qr_img, stream=qr_auditoria_bytes)
 
         x_texto_qr = 96
-        pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 18), "VALIDACI√ìN Y CONSULTA P√öBLICA DE INTEGRIDAD (PKCS#7 / SHA-256)", fontsize=6.8, fontname="helv", color=color_azul_corp)
-        pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 28), f"Valor del C√≥digo / Hash: {pkcs7_hash_real}", fontsize=5.6, fontname="courier", color=(0.1, 0.15, 0.25))
+        pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 18), "VALIDACI”N Y CONSULTA P⁄BLICA DE INTEGRIDAD (PKCS#7 / SHA-256)", fontsize=6.8, fontname="helv", color=color_azul_corp)
+        pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 28), f"Valor del CÛdigo / Hash: {pkcs7_hash_real}", fontsize=5.6, fontname="courier", color=(0.1, 0.15, 0.25))
         pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 38), f"Enlace de Consulta: {pkcs7_qr_url}", fontsize=5.6, fontname="courier", color=(0.2, 0.4, 0.8))
 
         y_offset += alto_bloque_qr + 8
         rect_fila_aviso = fitz.Rect(42, y_offset, 553, y_offset + 32)
         pagina_auditoria.draw_rect(rect_fila_aviso, color=(0.75, 0.83, 0.95), fill=(0.95, 0.97, 1.0), width=0.6)
-        pagina_auditoria.insert_text(fitz.Point(76, y_offset + 12), "‚Ä¢ Privacidad: La direccion IP y las coordenadas GPS se presentan enmascaradas para proteger la confidencialidad.", fontsize=5.8, color=(0.18, 0.23, 0.32))
-        pagina_auditoria.insert_text(fitz.Point(76, y_offset + 23), "‚Ä¢ Respaldo legal: Los registros originales permanecen custodiados bajo estandares de seguridad en Celerdoc.", fontsize=5.8, color=(0.18, 0.23, 0.32))
+        pagina_auditoria.insert_text(fitz.Point(76, y_offset + 12), "ï Privacidad: La direccion IP y las coordenadas GPS se presentan enmascaradas para proteger la confidencialidad.", fontsize=5.8, color=(0.18, 0.23, 0.32))
+        pagina_auditoria.insert_text(fitz.Point(76, y_offset + 23), "ï Respaldo legal: Los registros originales permanecen custodiados bajo estandares de seguridad en Celerdoc.", fontsize=5.8, color=(0.18, 0.23, 0.32))
 
         pagina_auditoria.draw_line(fitz.Point(42, 792), fitz.Point(553, 792), color=color_azul_corp, width=0.6)
         pagina_auditoria.insert_text(fitz.Point(42, 804), f"Certificado expedido por Celerdoc | Hash Final: {sha256_final_certificado[:32]}...", fontsize=6, color=(0.4, 0.45, 0.5))
@@ -602,18 +631,15 @@ async def procesar_firma(payload: FirmaPayload, request: Request, background_tas
         
         nombre_original_limpio = payload.nombre_archivo if payload.nombre_archivo.lower().endswith(".pdf") else f"{payload.nombre_archivo}.pdf"
         
-        # ESTRUCTURA EXACTA SOLICITADA:
-        # [NombreOriginal]_[TipoDoc][NumDoc]_[YYYYMMDDHHMMSS].pdf
         nombre_base_sin_ext = os.path.splitext(nombre_original_limpio)[0]
         tipo_doc_val = payload.codigo_tipo_doc or "CC"
         num_doc_limpio = "".join(c for c in payload.numero_documento if c.isalnum())
         sufijo_tiempo = ahora_utc.strftime("%Y%m%d%H%M%S")
         nombre_final = f"{nombre_base_sin_ext}_{tipo_doc_val}{num_doc_limpio}_{sufijo_tiempo}.pdf"
 
-        entropia_unica = uuid.uuid4().hex
-        pkcs7_hash_real = hashlib.sha256(f"{sha256_original}{entropia_unica}{timestamp_sellado_utc}{validador_id}".encode()).hexdigest()
+        hash_corto = sha256_original[:32]
+        pkcs7_hash_real = hashlib.sha256(f"{sha256_original}{timestamp_sellado_utc}{validador_id}".encode()).hexdigest()
         pkcs7_serial = f"PKCS7-SHA256-{pkcs7_hash_real[:24].upper()}"
-        hash_corto = pkcs7_hash_real[:32]
 
         sha256_final_certificado = hashlib.sha256(f"{sha256_original}{sha256_trazo}{validador_id}".encode()).hexdigest()
 
@@ -693,7 +719,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request, background_tas
 
         return {
             "estado": "exitoso",
-            "mensaje": "Documento firmado, auditado y certificado con √©xito.",
+            "mensaje": "Documento firmado, auditado y certificado con Èxito.",
             "datos_archivo": {
                 "nombre_final": nombre_final,
                 "ruta_descarga": f"/descargas/{nombre_final}"
