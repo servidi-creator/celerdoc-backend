@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Celerdoc — Firmar Documento</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- CDN ESTABLE COMPATIBLE CON TODOS LOS NAVEGADORES -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     :root[data-theme="light"] {
@@ -599,7 +600,7 @@
           </div>
         </div>
 
-        <!-- Pestaña 2: Imagen de Firma con UX Premium -->
+        <!-- Pestaña 2: Imagen de Firma -->
         <div class="tab-content" id="tabContentImagen">
           <div class="image-drop-zone" id="imageDropZone" onclick="document.getElementById('inputImgFirma').click()">
             <div class="image-upload-btn-ui">📂 Seleccionar Archivo de Imagen</div>
@@ -657,7 +658,9 @@
   </div>
 
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
+    }
 
     const API_URL = (window.location.protocol.startsWith('http')) ? window.location.origin : "https://celerdoc.onrender.com";
     const CODIGO_OTP_SIMULADO = "123456";
@@ -1341,53 +1344,63 @@
         return;
       }
 
-      datosTrazabilidad.nombre_archivo = nombreArchivo;
-      timestampCargaDocUtc = new Date().toISOString();
-      datosTrazabilidad.timestamp_utc = timestampCargaDocUtc;
-      
-      document.getElementById('txtBtnAccion').textContent = "Reemplazar documento";
-      document.getElementById('txtDropSubtitle').textContent = `Documento cargado: ${datosTrazabilidad.nombre_archivo}`;
+      try {
+        datosTrazabilidad.nombre_archivo = nombreArchivo;
+        timestampCargaDocUtc = new Date().toISOString();
+        datosTrazabilidad.timestamp_utc = timestampCargaDocUtc;
+        
+        document.getElementById('txtBtnAccion').textContent = "Reemplazar documento";
+        document.getElementById('txtDropSubtitle').textContent = `Documento cargado: ${datosTrazabilidad.nombre_archivo}`;
 
-      blobOriginalUrl = URL.createObjectURL(archivo);
-      paginasExtraEnBlanco = 0;
+        blobOriginalUrl = URL.createObjectURL(archivo);
+        paginasExtraEnBlanco = 0;
 
-      const arrayBuffer = await archivo.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
+        const arrayBuffer = await archivo.arrayBuffer();
+        
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        base64String = btoa(binary);
+
+        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        datosTrazabilidad.sha256_original = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+        const hashSincronizado = datosTrazabilidad.sha256_original.substring(0, 32);
+        datosTrazabilidad.pkcs7_aplicado.hash = datosTrazabilidad.sha256_original;
+        datosTrazabilidad.pkcs7_aplicado.qr_data = `${API_URL}/validar?sig=${hashSincronizado}`;
+
+        const pdfDataCopy = new Uint8Array(arrayBuffer.slice(0));
+        const loadingTask = pdfjsLib.getDocument({ data: pdfDataCopy });
+        pdfActual = await loadingTask.promise;
+        datosTrazabilidad.total_paginas = pdfActual.numPages;
+
+        toastFileName.textContent = datosTrazabilidad.nombre_archivo;
+        toastFileHash.textContent = datosTrazabilidad.sha256_original;
+        toastUploadModal.style.display = 'flex';
+        setTimeout(() => { toastUploadModal.style.display = 'none'; }, 4500);
+
+        lblTotalPagsToolbar.textContent = pdfActual.numPages;
+        inputNumPag.max = pdfActual.numPages;
+        
+        // MOSTRAR CONTENEDORES ANTES DE RENDERIZAR
+        navBar.style.display = 'flex';
+        boxViewer.style.display = 'block';
+
+        if (pdfActual.numPages > 100) {
+          btnDescargarLectura.style.display = 'inline-flex';
+        } else {
+          btnDescargarLectura.style.display = 'none';
+        }
+
+        await irAPagina(1);
+      } catch (error) {
+        console.error("Error al cargar PDF:", error);
+        alert("Ocurrió un error al procesar el archivo PDF: " + error.message);
       }
-      base64String = btoa(binary);
-
-      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      datosTrazabilidad.sha256_original = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-      const hashSincronizado = datosTrazabilidad.sha256_original.substring(0, 32);
-      datosTrazabilidad.pkcs7_aplicado.hash = datosTrazabilidad.sha256_original;
-      datosTrazabilidad.pkcs7_aplicado.qr_data = `${API_URL}/validar?sig=${hashSincronizado}`;
-
-      pdfActual = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      datosTrazabilidad.total_paginas = pdfActual.numPages;
-
-      toastFileName.textContent = datosTrazabilidad.nombre_archivo;
-      toastFileHash.textContent = datosTrazabilidad.sha256_original;
-      toastUploadModal.style.display = 'flex';
-      setTimeout(() => { toastUploadModal.style.display = 'none'; }, 4500);
-
-      lblTotalPagsToolbar.textContent = pdfActual.numPages;
-      inputNumPag.max = pdfActual.numPages;
-      
-      navBar.style.display = 'flex';
-      boxViewer.style.display = 'block';
-
-      if (pdfActual.numPages > 100) {
-        btnDescargarLectura.style.display = 'inline-flex';
-      } else {
-        btnDescargarLectura.style.display = 'none';
-      }
-
-      irAPagina(1);
     }
 
     fileInput.addEventListener('change', (e) => {
@@ -1460,8 +1473,8 @@
       } else {
         floatingSignGroup.style.left = `${(datosTrazabilidad.coordenadas.x_pct / 100) * canvasActive.width}px`;
         floatingSignGroup.style.top = `${(datosTrazabilidad.coordenadas.y_pct / 100) * canvasActive.height}px`;
-        floatingSignGroup.style.display = 'flex';
       }
+      floatingSignGroup.style.display = 'flex';
       renderizarEstampaPKCS7();
     }
 
@@ -1489,7 +1502,6 @@
         let x = e.clientX - rect.left;
         let y = e.clientY - rect.top;
 
-        // FORZAR CREACIÓN AUTOMÁTICA DE HOJA ANEXA AL LLEGAR ABAJO EN LA ÚLTIMA PÁGINA
         if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages && paginasExtraEnBlanco === 0 && y > rect.height - 25) {
           isDraggingMarker = false;
           paginasExtraEnBlanco = 1;
@@ -1511,7 +1523,6 @@
           return;
         }
 
-        // DEVOLVER Y ELIMINAR HOJA ANEXA SI LA SUBE AL TOPE SUPERIOR
         if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages + 1 && paginasExtraEnBlanco === 1 && y < 25) {
           isDraggingMarker = false;
           paginasExtraEnBlanco = 0;
