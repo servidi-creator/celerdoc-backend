@@ -39,51 +39,62 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # ==========================================
-# CONFIGURACION DE SUPABASE
+# CONFIGURACION DE SUPABASE MEDIANTE VARIABLES DE ENTORNO
 # ==========================================
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://nmibxvctzcdujglzovqc.supabase.co")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("Cliente de Supabase inicializado correctamente.")
+    if SUPABASE_KEY:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("✓ Cliente de Supabase inicializado correctamente.")
+    else:
+        print("ADVERTENCIA: SUPABASE_KEY no configurada en las variables de entorno.")
+        supabase = None
 except Exception as err_init:
     print(f"Error al inicializar cliente Supabase: {err_init}")
     supabase = None
 
 
 def guardar_registro_auditoria(registro: dict):
-    """Guarda de forma persistente los metadatos de auditoría directamente en Supabase."""
+    """Guarda de forma persistente todos los metadatos de auditoría con clave única por transacción."""
     if not supabase:
         print("ADVERTENCIA: Cliente Supabase no disponible.")
         return None
 
     try:
         if not registro.get("sig"):
-            registro["sig"] = registro.get("hash_pkcs7_corto") or registro.get("reporte_id_unico") or f"CELER-{uuid.uuid4().hex[:8]}"
+            registro["sig"] = registro.get("reporte_id_unico") or f"CELER-{uuid.uuid4().hex[:8]}"
 
-        if not registro.get("hash_pkcs7_corto"):
-            registro["hash_pkcs7_corto"] = registro["sig"]
+        if not registro.get("reporte_id_unico"):
+            registro["reporte_id_unico"] = registro["sig"]
 
         if not registro.get("firmante_registrado") and registro.get("nombre_firmante"):
             registro["firmante_registrado"] = registro["nombre_firmante"]
 
+        print(f"\n[SUPABASE] Guardando registro único:")
+        print(f" -> ID Reporte: {registro.get('sig')}")
+        print(f" -> Firmante: {registro.get('nombre_firmante')}")
+        print(f" -> Documento: {registro.get('tipo_documento')} {registro.get('numero_documento')}")
+        print(f" -> Email: {registro.get('email_notificacion')}")
+        print(f" -> WhatsApp: {registro.get('whatsapp_notificacion')}")
+
         res = supabase.table("auditoria").upsert(registro, on_conflict="sig").execute()
-        print("¡REGISTRO GUARDADO EN SUPABASE (UPSERT) CON ÉXITO!")
+        print("✓ ¡REGISTRO GUARDADO EN SUPABASE CON ÉXITO!")
         return res
     except Exception as e:
-        print(f"ADVERTENCIA EN UPSERT SUPABASE, INTENTANDO INSERT DIRECTO: {e}")
+        print(f"Aviso en upsert, reintentando insert: {e}")
         try:
             res = supabase.table("auditoria").insert(registro).execute()
-            print("¡REGISTRO GUARDADO EN SUPABASE (INSERT) CON ÉXITO!")
+            print("✓ ¡REGISTRO GUARDADO EN SUPABASE (INSERT) CON ÉXITO!")
             return res
         except Exception as e2:
-            print(f"ERROR AL GUARDAR EN SUPABASE: {e2}")
+            print(f"❌ ERROR CRÍTICO AL GUARDAR EN SUPABASE: {e2}")
             return None
 
 
 def consultar_registro_auditoria(sig: str) -> Optional[dict]:
-    """Recupera los metadatos de auditoría asociados a un sello PKCS#7 desde Supabase."""
+    """Recupera los metadatos de auditoría asociados a un sello desde Supabase."""
     if not supabase:
         return None
     try:
@@ -572,9 +583,10 @@ def generar_pdf_firmado_y_guardar(
     doc.save(ruta_salida_pdf)
     doc.close()
 
+    # Guardar en Supabase usando reporte_id_unico como clave única (sig) para evitar colisiones
     guardar_registro_auditoria({
         "hash_pkcs7_corto": hash_corto,
-        "sig": hash_corto,
+        "sig": reporte_id_unico,
         "nombre_doc_orig": nombre_original_limpio,
         "sha256_original": sha256_original,
         "fecha_carga_utc": ts_carga,
@@ -587,7 +599,17 @@ def generar_pdf_firmado_y_guardar(
         "reporte_id_unico": reporte_id_unico,
         "firmante_registrado": firmante_completo,
         "nombre_firmante": firmante_completo,
-        "total_paginas_certificadas": total_pags_cert
+        "total_paginas_certificadas": total_pags_cert,
+        "tipo_documento": tipo_documento,
+        "numero_documento": numero_documento,
+        "email_notificacion": email_notificacion,
+        "whatsapp_notificacion": whatsapp_notificacion,
+        "codigo_otp_validado": codigo_otp_validado,
+        "ts_terminos": ts_terms,
+        "ts_trazo": ts_trazo,
+        "ts_otp": ts_otp,
+        "ip_enmascarada": ip_enmascarada,
+        "gps_enmascarado": gps_enmascarado
     })
 
 
@@ -658,7 +680,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         ts_trazo = payload.timestamp_trazo or timestamp_sellado_utc
         ts_otp = payload.timestamp_otp or timestamp_sellado_utc
 
-        pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={hash_corto}"
+        pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={reporte_id_unico}"
 
         client_ip = request.client.host if request.client else "186.84.92.145"
         ip_enmascarada = enmascarar_ip(client_ip)
@@ -671,7 +693,6 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             "qr_data": pkcs7_qr_url
         }
 
-        # Generación síncrona: garantiza que el archivo existe en disco antes de devolver la respuesta
         generar_pdf_firmado_y_guardar(
             pdf_bytes,
             payload.total_paginas_con_extras,

@@ -663,12 +663,7 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
     }
 
-    // DIRECCIÓN INTELIGENTE: Si estás probando en tu computador (sea en http://127.0.0.1:8000 o abriendo el archivo local), se conecta a tu servidor local de Python
-    const esLocal = window.location.protocol === 'file:' || 
-                    window.location.hostname === 'localhost' || 
-                    window.location.hostname === '127.0.0.1';
-    const API_URL = esLocal ? "http://127.0.0.1:8000" : window.location.origin;
-
+    const API_URL = (window.location.protocol.startsWith('http')) ? window.location.origin : "https://celerdoc.onrender.com";
     const CODIGO_OTP_SIMULADO = "123456";
     const MAX_INTENTOS_OTP = 5;
     let intentosFallidosOTP = 0;
@@ -690,7 +685,7 @@
       { codigo: "CU", nombre: "Cuba", indicativo: "+53", bandera: "🇨🇺", lang: "es" },
       { codigo: "BO", nombre: "Bolivia", indicativo: "+591", bandera: "🇧🇴", lang: "es" },
       { codigo: "DO", nombre: "República Dominicana", indicativo: "+1", bandera: "🇩🇴", lang: "es" },
-      { codigo: "HN", nombre: "Honduras", indicativo: "+504", bandera: "HN", lang: "es" },
+      { codigo: "HN", nombre: "Honduras", indicativo: "+504", bandera: "🇭🇳", lang: "es" },
       { codigo: "PY", nombre: "Paraguay", indicativo: "+595", bandera: "🇵🇾", lang: "es" },
       { codigo: "SV", nombre: "El Salvador", indicativo: "+503", bandera: "🇸🇻", lang: "es" },
       { codigo: "NI", nombre: "Nicaragua", indicativo: "+505", bandera: "🇳🇮", lang: "es" },
@@ -1671,7 +1666,7 @@
         nombre_archivo: datosTrazabilidad.nombre_archivo,
         nombre_final_sugerido: "documento_firmado.pdf",
         archivo_base64: base64String,
-        tipo_documento: selectTipoDoc.options[selectTipoDoc.selectedIndex] ? selectTipoDoc.options[selectTipoDoc.selectedIndex].text : selectTipoDoc.value,
+        tipo_documento: selectTipoDoc.options[selectTipoDoc.selectedIndex].text,
         codigo_tipo_doc: selectTipoDoc.value,
         numero_documento: inputNumDoc.value.trim(),
         nombre_firmante: inputNombre.value.trim(),
@@ -1695,28 +1690,18 @@
       };
 
       try {
-        console.log("Enviando datos al servidor local:", payload);
         const resp = await fetch(`${API_URL}/procesar-firma`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-
-        if (!resp.ok) {
-          const errText = await resp.text();
-          console.error("Error devuelto por el servidor:", errText);
-          alert("Error en el servidor al procesar la firma: " + errText);
-          return;
-        }
-
         const data = await resp.json();
         descargaUrlActual = `${API_URL}${data.datos_archivo.ruta_descarga}`;
         successPanel.style.display = 'block';
         successPanel.scrollIntoView({ behavior: 'smooth' });
         btnDescargar.style.display = 'inline-block';
       } catch (err) {
-        console.error("Error de conexión:", err);
-        alert("Error de conexión con el servidor en " + API_URL + ": " + err.message);
+        alert("Error en el servidor al procesar la firma.");
       }
     }
 
