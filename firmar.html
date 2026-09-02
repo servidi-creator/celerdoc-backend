@@ -484,7 +484,7 @@
     <h1 id="txtTitulo">Celerdoc — Firmar Documento</h1>
     <p class="desc" id="txtDesc">Cargue su documento original, ubique el punto de firma, complete sus datos y realice su trazo o inserte su firma para generar el documento certificado.</p>
 
-    <div class="form-grid">
+    <div class="form-grid" id="formGridContainer">
       <div class="form-group">
         <label for="tipoDoc" id="lblTipoDoc">Tipo de Documento *</label>
         <select id="tipoDoc">
@@ -663,7 +663,6 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
     }
 
-    // DIRECCIÓN INTELIGENTE: Si estás probando en tu computador (sea en http://127.0.0.1:8000 o abriendo el archivo local), se conecta a tu servidor local de Python
     const esLocal = window.location.protocol === 'file:' || 
                     window.location.hostname === 'localhost' || 
                     window.location.hostname === '127.0.0.1';
@@ -1272,6 +1271,20 @@
           timestampOtpValidadoUtc = new Date().toISOString();
           otpErrorMsg.textContent = '';
           modalOtp.style.display = 'none';
+          
+          // OCULTAR CAMPOS, DROPZONE Y VISOR TRAS VALIDAR OTP EXITOSAMENTE
+          const formGrid = document.querySelector('.form-grid');
+          const termsWrap = document.getElementById('wrapTerms');
+          const dropAreaEl = document.getElementById('dropArea');
+          const navBarEl = document.getElementById('navBar');
+          const boxViewerEl = document.getElementById('boxViewer');
+          
+          if (formGrid) formGrid.style.display = 'none';
+          if (termsWrap) termsWrap.style.display = 'none';
+          if (dropAreaEl) dropAreaEl.style.display = 'none';
+          if (navBarEl) navBarEl.style.display = 'none';
+          if (boxViewerEl) boxViewerEl.style.display = 'none';
+
           ejecutarProcesoFirmaBackend(codigo);
         } else {
           intentosFallidosOTP += 1;
