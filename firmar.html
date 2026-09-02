@@ -1386,7 +1386,6 @@
         lblTotalPagsToolbar.textContent = pdfActual.numPages;
         inputNumPag.max = pdfActual.numPages;
         
-        // MOSTRAR CONTENEDORES ANTES DE RENDERIZAR
         navBar.style.display = 'flex';
         boxViewer.style.display = 'block';
 
@@ -1502,7 +1501,7 @@
         let x = e.clientX - rect.left;
         let y = e.clientY - rect.top;
 
-        if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages && paginasExtraEnBlanco === 0 && y > rect.height - 25) {
+        if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages && paginasExtraEnBlanco === 0 && y > rect.height - 30) {
           isDraggingMarker = false;
           paginasExtraEnBlanco = 1;
           lblTotalPagsToolbar.textContent = pdfActual.numPages + 1;
@@ -1523,7 +1522,7 @@
           return;
         }
 
-        if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages + 1 && paginasExtraEnBlanco === 1 && y < 25) {
+        if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages + 1 && paginasExtraEnBlanco === 1 && y < 30) {
           isDraggingMarker = false;
           paginasExtraEnBlanco = 0;
           lblTotalPagsToolbar.textContent = pdfActual.numPages;
