@@ -204,7 +204,7 @@
     .btn-download-reader { background: var(--brand-primary); color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; display: none; align-items: center; gap: 6px; }
     .btn-download-reader:hover { background: var(--brand-primary-hover); }
 
-    .viewer-box { position: relative; width: 100%; border: 1px solid var(--border-input); border-radius: 6px; overflow: auto; background: var(--viewer-bg); display: none; text-align: center; max-height: 75vh; padding: 16px; }
+    .viewer-box { position: relative; width: 100%; border: 1px solid var(--border-input); border-radius: 6px; overflow: auto; background: var(--viewer-bg); display: none; text-align: center; max-height: 75vh; padding: 16px; scroll-behavior: smooth; }
     .pages-cascade-container { display: flex; flex-direction: column; align-items: center; gap: 24px; position: relative; }
     .canvas-page-wrapper { position: relative; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.12); border-radius: 4px; overflow: hidden; background: #ffffff; }
     .canvas-page-wrapper canvas { display: block; }
@@ -238,6 +238,7 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.12);
       backdrop-filter: blur(1px);
       position: relative;
+      touch-action: none;
     }
     #markerFirma:active { cursor: grabbing; }
 
@@ -245,8 +246,8 @@
       position: absolute;
       right: 2px;
       bottom: 2px;
-      width: 14px;
-      height: 14px;
+      width: 16px;
+      height: 16px;
       cursor: se-resize;
       background: #3366CC;
       border-radius: 2px;
@@ -254,7 +255,7 @@
       align-items: center;
       justify-content: center;
       color: #ffffff;
-      font-size: 8px;
+      font-size: 9px;
       touch-action: none;
     }
 
@@ -1395,7 +1396,13 @@
           btnDescargarLectura.style.display = 'none';
         }
 
-        await irAPagina(1);
+        // Posicionar y proponer firma directamente en la última página original
+        datosTrazabilidad.coordenadas = { x_pct: null, y_pct: null };
+        await irAPagina(pdfActual.numPages);
+        setTimeout(() => {
+          boxViewer.scrollTop = boxViewer.scrollHeight;
+        }, 180);
+
       } catch (error) {
         console.error("Error al cargar PDF:", error);
         alert("Ocurrió un error al procesar el archivo PDF: " + error.message);
@@ -1436,7 +1443,7 @@
       if (num > maxPaginasTotal) num = maxPaginasTotal;
       datosTrazabilidad.pagina_activa = num;
       inputNumPag.value = num;
-      renderizarVisualizadorCascade(num);
+      return renderizarVisualizadorCascade(num);
     }
 
     async function renderizarVisualizadorCascade(numPagina) {
@@ -1479,59 +1486,65 @@
 
     let isDraggingMarker = false;
     let isResizingMarker = false;
+    let isChangingPage = false;
     let startResizeX = 0;
     let startResizeW = 200;
 
-    markerFirma.addEventListener('mousedown', (e) => {
-      if (e.target === resizeHandle) return;
+    function iniciarArrastre(clientX, clientY, target) {
+      if (target === resizeHandle) return;
       isDraggingMarker = true;
-      e.stopPropagation();
-    });
+    }
 
-    resizeHandle.addEventListener('mousedown', (e) => {
+    function iniciarResize(clientX) {
       isResizingMarker = true;
-      startResizeX = e.clientX;
+      startResizeX = clientX;
       startResizeW = floatingSignGroup.offsetWidth;
-      e.stopPropagation();
-    });
+    }
 
-    window.addEventListener('mousemove', (e) => {
+    function procesarMovimiento(clientX, clientY) {
+      if (isChangingPage) return;
+
       if (isDraggingMarker) {
         const rect = canvasActive.getBoundingClientRect();
-        let x = e.clientX - rect.left;
-        let y = e.clientY - rect.top;
+        let x = clientX - rect.left;
+        let y = clientY - rect.top;
 
-        if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages && paginasExtraEnBlanco === 0 && y > rect.height - 30) {
-          isDraggingMarker = false;
+        // Auto-crear y saltar a página adicional al rebasar el borde inferior de la última página
+        if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages && paginasExtraEnBlanco === 0 && y >= rect.height - 35) {
+          isChangingPage = true;
           paginasExtraEnBlanco = 1;
-          lblTotalPagsToolbar.textContent = pdfActual.numPages + 1;
-          inputNumPag.max = pdfActual.numPages + 1;
-          datosTrazabilidad.pagina_activa = pdfActual.numPages + 1;
-          inputNumPag.value = datosTrazabilidad.pagina_activa;
+          const totalConExtra = pdfActual.numPages + 1;
+          lblTotalPagsToolbar.textContent = totalConExtra;
+          inputNumPag.max = totalConExtra;
+          datosTrazabilidad.pagina_activa = totalConExtra;
+          inputNumPag.value = totalConExtra;
           
-          renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa).then(() => {
-            const targetX = Math.max(40, Math.min(canvasActive.width - 40, x));
-            const targetY = 80;
+          renderizarVisualizadorCascade(totalConExtra).then(() => {
+            const targetX = Math.max(50, Math.min(canvasActive.width - 50, x));
+            const targetY = 90;
             floatingSignGroup.style.left = `${targetX}px`;
             floatingSignGroup.style.top = `${targetY}px`;
             datosTrazabilidad.coordenadas = {
               x_pct: parseFloat(((targetX / canvasActive.width) * 100).toFixed(2)),
               y_pct: parseFloat(((targetY / canvasActive.height) * 100).toFixed(2))
             };
+            boxViewer.scrollTop = 0;
+            setTimeout(() => { isChangingPage = false; }, 120);
           });
           return;
         }
 
-        if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages + 1 && paginasExtraEnBlanco === 1 && y < 30) {
-          isDraggingMarker = false;
+        // Retornar y remover página adicional al arrastrar al borde superior de la página anexa
+        if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages + 1 && paginasExtraEnBlanco === 1 && y <= 35) {
+          isChangingPage = true;
           paginasExtraEnBlanco = 0;
           lblTotalPagsToolbar.textContent = pdfActual.numPages;
           inputNumPag.max = pdfActual.numPages;
           datosTrazabilidad.pagina_activa = pdfActual.numPages;
-          inputNumPag.value = datosTrazabilidad.pagina_activa;
+          inputNumPag.value = pdfActual.numPages;
           
           renderizarVisualizadorCascade(datosTrazabilidad.pagina_activa).then(() => {
-            const targetX = Math.max(40, Math.min(canvasActive.width - 40, x));
+            const targetX = Math.max(50, Math.min(canvasActive.width - 50, x));
             const targetY = canvasActive.height - 90;
             floatingSignGroup.style.left = `${targetX}px`;
             floatingSignGroup.style.top = `${targetY}px`;
@@ -1539,10 +1552,13 @@
               x_pct: parseFloat(((targetX / canvasActive.width) * 100).toFixed(2)),
               y_pct: parseFloat(((targetY / canvasActive.height) * 100).toFixed(2))
             };
+            boxViewer.scrollTop = boxViewer.scrollHeight;
+            setTimeout(() => { isChangingPage = false; }, 120);
           });
           return;
         }
 
+        // Arrastre libre dentro del lienzo
         if (y >= 0 && y <= rect.height && x >= 0 && x <= rect.width) {
           floatingSignGroup.style.left = `${x}px`;
           floatingSignGroup.style.top = `${y}px`;
@@ -1552,18 +1568,61 @@
           };
         }
       } else if (isResizingMarker) {
-        const diffX = e.clientX - startResizeX;
+        const diffX = clientX - startResizeX;
         const newW = Math.max(140, Math.min(320, startResizeW + diffX));
         const newH = Math.round(newW * 0.4);
         floatingSignGroup.style.width = `${newW}px`;
         markerFirma.style.height = `${newH}px`;
       }
-    });
+    }
 
-    window.addEventListener('mouseup', () => {
+    function finalizarArrastre() {
       isDraggingMarker = false;
       isResizingMarker = false;
+    }
+
+    // Eventos Mouse
+    markerFirma.addEventListener('mousedown', (e) => {
+      if (e.target === resizeHandle) return;
+      iniciarArrastre(e.clientX, e.clientY, e.target);
+      e.stopPropagation();
     });
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+      iniciarResize(e.clientX);
+      e.stopPropagation();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      procesarMovimiento(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mouseup', finalizarArrastre);
+
+    // Eventos Táctiles
+    markerFirma.addEventListener('touchstart', (e) => {
+      if (e.target === resizeHandle) return;
+      const t = e.touches[0];
+      iniciarArrastre(t.clientX, t.clientY, e.target);
+      e.stopPropagation();
+      e.preventDefault();
+    }, { passive: false });
+
+    resizeHandle.addEventListener('touchstart', (e) => {
+      iniciarResize(e.touches[0].clientX);
+      e.stopPropagation();
+      e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      if (isDraggingMarker || isResizingMarker) {
+        const t = e.touches[0];
+        procesarMovimiento(t.clientX, t.clientY);
+        if (e.cancelable) e.preventDefault();
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchend', finalizarArrastre);
 
     inputNumPag.addEventListener('change', () => {
       let val = parseInt(inputNumPag.value) || 1;
