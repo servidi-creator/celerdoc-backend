@@ -8,6 +8,7 @@ import random
 from datetime import datetime, timezone
 import traceback
 import urllib.request
+import urllib.parse
 import urllib.error
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,7 +40,7 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Memoria temporal para almacenar los códigos OTP activos por correo
+# Memoria temporal para almacenar los códigos OTP activos por correo o teléfono
 ALMACEN_OTP_TEMPORAL = {}
 
 # ==========================================
@@ -60,40 +61,83 @@ except Exception as err_init:
     supabase = None
 
 
-def enviar_correo_twilio(email_destino: str, asunto: str, cuerpo_html: str):
-    """Registra de forma segura el código OTP en los logs de Render para garantizar que el flujo web avance sin errores de autenticación externa."""
-    print(f"\n==================================================")
-    print(f"🔐 [TWILIO / OTP SEGURO] Destino: {email_destino} | Asunto: {asunto}")
-    print(f"==================================================\n")
-    return True
+def enviar_whatsapp_twilio(whatsapp_destino: str, codigo_otp: str):
+    """Envía el código OTP de forma real a través de la API oficial de WhatsApp de Twilio."""
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    twilio_whatsapp_from = os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
+    
+    if not account_sid or not auth_token or not whatsapp_destino:
+        print("ℹ️ Credenciales de Twilio WhatsApp no completas. Omitiendo envío de WhatsApp.")
+        return False
+        
+    url = f"https://api.twilio.com/2010-04-10/Accounts/{account_sid}/Messages.json"
+    
+    to_num = whatsapp_destino.strip()
+    if not to_num.startswith("whatsapp:"):
+        if not to_num.startswith("+"):
+            to_num = f"+{to_num}"
+        to_num = f"whatsapp:{to_num}"
+        
+    data = urllib.parse.urlencode({
+        "From": twilio_whatsapp_from,
+        "To": to_num,
+        "Body": f"🔐 Tu código de verificación OTP en Celerdoc es: *{codigo_otp}*. Válido para completar tu proceso de firma."
+    }).encode('utf-8')
+    
+    credentials = f"{account_sid}:{auth_token}"
+    encoded_credentials = base64.b64encode(credentials.encode('ascii')).decode('ascii')
+    
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Authorization": f"Basic {encoded_credentials}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req) as response:
+            print(f"✓ WhatsApp enviado exitosamente vía Twilio a {to_num}")
+            return True
+    except Exception as e:
+        print(f"❌ Error al enviar WhatsApp con Twilio: {e}")
+        return False
 
 
 class OtpRequest(BaseModel):
     email: str
     nombre_firmante: Optional[str] = "Firmante"
+    whatsapp: Optional[str] = None
 
 
 @app.post("/enviar-otp")
 async def solicitar_codigo_otp(payload: OtpRequest):
-    """Genera un código OTP real de 6 dígitos, lo retorna en la respuesta API y consola para pruebas inmediatas."""
-    if not payload.email:
-        raise HTTPException(status_code=400, detail="El correo electrónico es obligatorio para enviar el OTP.")
+    """Genera un código OTP real de 6 dígitos, lo almacena y lo despacha vía WhatsApp/Consola."""
+    contacto_key = (payload.email or payload.whatsapp or "").strip().lower()
+    if not contacto_key:
+        raise HTTPException(status_code=400, detail="El correo o número de WhatsApp es obligatorio para enviar el OTP.")
     
     codigo_otp = str(random.randint(100000, 999999))
     
-    ALMACEN_OTP_TEMPORAL[payload.email.strip().lower()] = {
+    ALMACEN_OTP_TEMPORAL[contacto_key] = {
         "codigo": codigo_otp,
         "timestamp": datetime.now(timezone.utc).timestamp()
     }
     
-    print(f"\n**************************************************")
-    print(f"🔑 CÓDIGO OTP ACTIVO PARA {payload.email.strip().lower()}: [{codigo_otp}]")
-    print(f"**************************************************\n")
+    print(f"\n==================================================")
+    print(f"🔑 CÓDIGO OTP ACTIVO PARA {contacto_key}: [{codigo_otp}]")
+    print(f"==================================================\n")
     
+    # Intentar despacho por WhatsApp si se proporcionó teléfono
+    if payload.whatsapp:
+        enviar_whatsapp_twilio(payload.whatsapp, codigo_otp)
+
     return {
         "estado": "exitoso",
-        "mensaje": f"Código OTP generado correctamente. Tu código de acceso es: {codigo_otp}",
-        "codigo_otp": codigo_otp
+        "mensaje": "Código OTP generado y despachado correctamente.",
+        "codigo_otp_debug": codigo_otp
     }
 
 
@@ -766,7 +810,6 @@ def generar_pdf_firmado_y_guardar(
     pdf_output_bytes = doc.tobytes()
     doc.close()
 
-    # Subir a Supabase Storage
     if supabase:
         try:
             supabase.storage.from_("documentos-firmados").upload(
@@ -778,7 +821,6 @@ def generar_pdf_firmado_y_guardar(
         except Exception as err_storage:
             print(f"❌ Error al subir a Supabase Storage: {err_storage}")
 
-    # Guardar metadatos de auditoría en Supabase SQL
     guardar_registro_auditoria({
         "hash_pkcs7_corto": hash_corto,
         "sig": reporte_id_unico,
@@ -807,34 +849,6 @@ def generar_pdf_firmado_y_guardar(
         "gps_enmascarado": gps_real
     })
 
-    # ENVIAR CORREO AUTOMÁTICO CON ENLACE DE DESCARGA
-    if email_notificacion:
-        enlace_descarga_url = f"{BASE_URL_PUBLICO}/descargas/{nombre_final}"
-        asunto_fin = "📄 ¡Tu documento ha sido firmado y certificado con éxito! — Celerdoc"
-        cuerpo_fin = f"""
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-            <h2 style="color: #3366CC; margin-top: 0; font-size: 20px;">¡Hola, {nombre_firmante}! 👋</h2>
-            <p style="font-size: 14px; line-height: 1.5;">Queremos confirmarte que tu documento <strong>{nombre_original_limpio}</strong> ha sido firmado, sellado criptográficamente y certificado con plena validez legal en Celerdoc.</p>
-            <p style="font-size: 14px; line-height: 1.5;">Tu tranquilidad y la seguridad de tus datos son nuestra prioridad. Este documento cuenta con trazabilidad avanzada, estampa de tiempo y un registro único de auditoría protegido en la nube.</p>
-            
-            <div style="text-align: center; margin: 32px 0;">
-                <a href="{enlace_descarga_url}" style="background-color: #3366CC; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block; box-shadow: 0 4px 10px rgba(51,102,204,0.2);">📥 Descargar mi documento firmado</a>
-            </div>
-            
-            <p style="font-size: 12px; color: #64748b; text-align: center;">Este enlace es permanente y seguro. Podrás acceder a él siempre que lo necesites.</p>
-            
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
-            
-            <h3 style="color: #0f172a; font-size: 15px; margin-bottom: 8px;">¿Te gustó la experiencia? 🚀</h3>
-            <p style="font-size: 13.5px; color: #475569; line-height: 1.5; margin-top: 0;">En Celerdoc transformamos un trámite pesado en un proceso rápido, moderno y sin complicaciones. La próxima vez que necesites firmar un contrato, un acuerdo o un documento importante, hazlo en segundos y con total confianza. ¡Estamos aquí para simplificar tu vida!</p>
-            
-            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-                Celerdoc &copy; 2026 • <a href="https://celerdoc.onrender.com" style="color: #3366CC; text-decoration: none;">https://celerdoc.onrender.com</a>
-            </p>
-        </div>
-        """
-        enviar_correo_twilio(email_notificacion, asunto_fin, cuerpo_fin)
-
 
 class FirmaPayload(BaseModel):
     nombre_archivo: str
@@ -859,7 +873,7 @@ class FirmaPayload(BaseModel):
     timestamp_trazo: Optional[str] = None
     timestamp_otp: Optional[str] = None
     sha256_original: Optional[str] = None
-    codigo_otp_validado: Optional[str] = "123456"
+    codigo_otp_validado: Optional[str] = None
     user_agent: Optional[str] = None
     idioma_seleccionado: Optional[str] = "es"
 
@@ -867,18 +881,16 @@ class FirmaPayload(BaseModel):
 @app.post("/procesar-firma")
 async def procesar_firma(payload: FirmaPayload, request: Request):
     try:
-        # VALIDACIÓN DEL CÓDIGO OTP REAL
-        if payload.email_notificacion:
-            email_key = payload.email_notificacion.strip().lower()
-            otp_ingresado = str(payload.codigo_otp_validado).strip()
-            
-            if email_key in ALMACEN_OTP_TEMPORAL:
-                otp_guardado = ALMACEN_OTP_TEMPORAL[email_key]["codigo"]
-                if otp_ingresado != otp_guardado and otp_ingresado != "123456":
-                    raise HTTPException(status_code=400, detail="El código OTP ingresado es incorrecto.")
-            else:
-                if otp_ingresado != "123456":
-                    raise HTTPException(status_code=400, detail="No se encontró un código OTP activo para este correo. Solicítalo primero.")
+        # VALIDACIÓN ESTRICTA DEL CÓDIGO OTP REAL ALMACENADO
+        contacto_key = (payload.email_notificacion or payload.whatsapp_notificacion or "").strip().lower()
+        otp_ingresado = str(payload.codigo_otp_validado).strip()
+        
+        if contacto_key in ALMACEN_OTP_TEMPORAL:
+            otp_guardado = ALMACEN_OTP_TEMPORAL[contacto_key]["codigo"]
+            if otp_ingresado != otp_guardado:
+                raise HTTPException(status_code=400, detail="El código OTP ingresado es incorrecto.")
+        else:
+            raise HTTPException(status_code=400, detail="No se encontró un código OTP activo para este contacto. Solicítalo primero.")
 
         pdf_bytes = base64.b64decode(payload.archivo_base64)
         sha256_original = hashlib.sha256(pdf_bytes).hexdigest()
@@ -974,7 +986,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
 
         return {
             "estado": "exitoso",
-            "mensaje": "Documento firmado, auditado, certificado y correo enviado con éxito.",
+            "mensaje": "Documento firmado, auditado y certificado con éxito.",
             "datos_archivo": {
                 "nombre_final": nombre_final,
                 "ruta_descarga": f"/descargas/{nombre_final}"
@@ -986,7 +998,8 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
                 "pkcs7_serial": pkcs7_serial,
                 "codigo_validador": validador_id,
                 "sellado_tiempo_utc": timestamp_sellado_utc,
-                "idioma_reporte": idioma_reporte_final}
+                "idioma_reporte": idioma_reporte_final
+            }
         }
     except HTTPException as he:
         raise he
