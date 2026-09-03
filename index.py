@@ -422,6 +422,80 @@ def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
         pagina.insert_text(fitz.Point(68, alto_pag - 18), texto_completo, fontsize=5.5, fontname="courier-bold", color=color_azul)
 
 
+# =========================================================================
+# FUNCIONES DE ENMASCARAMIENTO EXCLUSIVAS PARA REPORTE DE AUDITORIA Y TRAZABILIDAD
+# =========================================================================
+def enmascarar_ip_reporte(ip_str: str) -> str:
+    """Enmascara la IP conservando el primer número visible, puntos y los dos últimos números visibles."""
+    if not ip_str or "." not in str(ip_str):
+        return ip_str or "No disponible"
+    
+    partes = str(ip_str).strip().split(".")
+    if len(partes) != 4:
+        return ip_str
+
+    digitos_totales = [c for c in ip_str if c.isdigit()]
+    total_digitos = len(digitos_totales)
+    if total_digitos < 3:
+        return ip_str
+
+    octetos = []
+    conteo = 0
+    for parte in partes:
+        nuevo_octeto = ""
+        for ch in parte:
+            if ch.isdigit():
+                conteo += 1
+                if conteo == 1:
+                    nuevo_octeto += ch
+                elif conteo > (total_digitos - 2):
+                    nuevo_octeto += ch
+                else:
+                    nuevo_octeto += "*"
+            else:
+                nuevo_octeto += ch
+        octetos.append(nuevo_octeto)
+    return ".".join(octetos)
+
+
+def enmascarar_coordenada_gps(coord_val: Any) -> str:
+    """
+    Formato: Signo (+ o -), enteros correspondientes, punto y 4 decimales.
+    Solo visibles signo (+/-), punto y los dos últimos dígitos de la derecha.
+    El resto con asteriscos conservando la cantidad de caracteres.
+    """
+    if coord_val is None:
+        return "No disponible"
+    try:
+        val = float(coord_val)
+        signo = "+" if val >= 0 else "-"
+        abs_val = abs(val)
+        partes = f"{abs_val:.4f}".split(".")
+        enteros_str = partes[0]
+        decimales_str = partes[1]  # 4 decimales
+        enteros_mask = "*" * len(enteros_str)
+        decimales_mask = f"**{decimales_str[-2:]}"
+        return f"{signo}{enteros_mask}.{decimales_mask}"
+    except Exception:
+        return str(coord_val)
+
+
+def formatear_gps_reporte_desde_cadena(gps_cadena: str) -> str:
+    """Procesa una cadena 'Lat: X, Lon: Y' y enmascara cada componente respetando la regla."""
+    if not gps_cadena or "Lat:" not in str(gps_cadena) or "Lon:" not in str(gps_cadena):
+        return gps_cadena or "No disponible / No proporcionado"
+    try:
+        sin_prefijos = str(gps_cadena).replace("Lat:", "").strip()
+        partes = sin_prefijos.split(",")
+        lat_raw = float(partes[0].strip())
+        lon_raw = float(partes[1].replace("Lon:", "").strip())
+        lat_enmascarada = enmascarar_coordenada_gps(lat_raw)
+        lon_enmascarada = enmascarar_coordenada_gps(lon_raw)
+        return f"Lat: {lat_enmascarada}, Lon: {lon_enmascarada}"
+    except Exception:
+        return gps_cadena
+
+
 def generar_pdf_firmado_y_guardar(
     pdf_bytes: bytes,
     total_paginas_con_extras: int,
@@ -497,6 +571,10 @@ def generar_pdf_firmado_y_guardar(
 
     total_pags_cert = f"{len(doc)} paginas (incluye hoja de auditoria)"
 
+    # ENMASCARAMIENTO EXCLUSIVO PARA LA VISUALIZACIÓN DEL REPORTE DE AUDITORIA
+    ip_reporte_visible = enmascarar_ip_reporte(ip_real)
+    gps_reporte_visible = formatear_gps_reporte_desde_cadena(gps_real)
+
     filas_auditoria = [
         ("Documento Original", f"{nombre_original_limpio} (Cargado: {ts_carga[:19]} UTC)"),
         ("Documento Final Certificado", nombre_final),
@@ -512,8 +590,8 @@ def generar_pdf_firmado_y_guardar(
         ("Codigo Validador Transaccion", validador_id),
         ("Codigo OTP Enviado y Verificado", f"OTP-{codigo_otp_validado or '123456'}"),
         ("Aceptacion y Validacion OTP", f"Aceptado y autenticado con exito ({ts_otp[:19]} UTC)"),
-        ("Direccion IP del Firmante", f"{ip_real} (Registrada: {ts_otp[:19]} UTC)"),
-        ("Geolocalizacion GPS", f"{gps_real} (Capturada: {ts_trazo[:19]} UTC)"),
+        ("Direccion IP del Firmante", f"{ip_reporte_visible} (Registrada: {ts_otp[:19]} UTC)"),
+        ("Geolocalizacion GPS", f"{gps_reporte_visible} (Capturada: {ts_trazo[:19]} UTC)"),
         ("Ubicacion de Sello en Documento", f"Pagina {pagina_seleccionada} [X: {x_pct}%, Y: {y_pct}%]"),
         ("Total Paginas Certificadas", total_pags_cert),
         ("Sellado Final de Integridad UTC", timestamp_sellado_utc)
@@ -555,7 +633,7 @@ def generar_pdf_firmado_y_guardar(
     doc.save(ruta_salida_pdf)
     doc.close()
 
-    # Guardar en Supabase usando reporte_id_unico como clave única (sig) para evitar colisiones
+    # Guardar en Supabase usando datos 100% íntegros y reales (sin máscaras de reporte)
     guardar_registro_auditoria({
         "hash_pkcs7_corto": hash_corto,
         "sig": reporte_id_unico,
@@ -654,7 +732,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
 
         pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={reporte_id_unico}"
 
-        # Obtención de datos reales y directos (Sin máscaras)
+        # Obtención de datos reales y directos (Sin máscaras para base de datos)
         client_ip = request.client.host if request.client else "186.84.92.145"
         ip_real = client_ip
         

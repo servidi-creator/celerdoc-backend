@@ -58,7 +58,8 @@
     body { background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 24px 16px; display: flex; flex-direction: column; align-items: center; }
     .container { width: 100%; max-width: 1050px; background-color: var(--bg-card); border: 1px solid var(--border-card); border-radius: 10px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
 
-    .top-controls { display: flex; justify-content: flex-end; align-items: center; background: var(--bg-subtle); border: 1px solid var(--border-subtle); padding: 10px 14px; border-radius: 8px; margin-bottom: 20px; gap: 10px; position: relative; }
+    .top-controls { display: flex; justify-content: space-between; align-items: center; background: var(--bg-subtle); border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 8px; margin-bottom: 20px; gap: 10px; position: relative; }
+    .left-controls-secondary { display: flex; align-items: center; }
     .right-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     
     .btn-control { background: var(--bg-card); border: 1px solid var(--border-input); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
@@ -74,8 +75,8 @@
     .btn-more-countries { width: 100%; border: none; background: var(--bg-subtle); color: var(--brand-primary); padding: 9px; border-radius: 5px; font-weight: 600; font-size: 12px; cursor: pointer; text-align: center; margin-top: 6px; }
     .btn-more-countries:hover { background: var(--border-subtle); }
 
-    .theme-toggle-btn { background: var(--bg-card); border: 1px solid var(--border-input); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 12.5px; cursor: pointer; font-weight: 500; transition: all 0.2s ease; }
-    .theme-toggle-btn:hover { border-color: var(--brand-primary); }
+    .theme-toggle-btn { background: var(--bg-card); border: 1px solid var(--border-subtle); color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s ease; padding: 0; }
+    .theme-toggle-btn:hover { border-color: var(--brand-primary); color: var(--brand-primary); background: var(--bg-subtle); transform: scale(1.05); }
 
     h1 { margin: 0 0 6px 0; font-size: 22px; color: var(--brand-primary); font-weight: 600; }
     p.desc { margin: 0 0 20px 0; color: var(--text-muted); font-size: 13px; line-height: 1.4; }
@@ -463,12 +464,16 @@
 
   <div class="container">
     <div class="top-controls">
+      <div class="left-controls-secondary">
+        <button class="theme-toggle-btn" id="btnThemeToggle" title="Ambientación">☀️</button>
+      </div>
+
       <div class="right-controls">
-        <button class="btn-control" id="btnForceEn">🇺🇸 English (EN)</button>
-        <button class="btn-control" id="btnNativeCountry">🇨🇴 Colombia</button>
+        <button class="btn-control" id="btnForceEn" title="English">🇺🇸 EN</button>
+        <button class="btn-control" id="btnNativeCountry" title="Idioma local">🇨🇴 ES</button>
         
         <div class="country-selector-wrap">
-          <button class="btn-control" id="btnCountrySelect">🇨🇴 Colombia (+57) ▾</button>
+          <button class="btn-control" id="btnCountrySelect">🇨🇴 Colombia ▾</button>
           <div class="country-dropdown" id="countryDropdown">
             <div class="country-section-title" id="titleSugeridos">Top 20 Países Sugeridos</div>
             <div id="listSuggested"></div>
@@ -476,8 +481,6 @@
             <div id="listAllCountries" style="display: none; margin-top: 6px;"></div>
           </div>
         </div>
-
-        <button class="theme-toggle-btn" id="btnThemeToggle">☀️ Claro</button>
       </div>
     </div>
 
@@ -681,38 +684,38 @@
     let timestampTrazoFirmaUtc = "";
 
     const catalogoPaises = [
-      { codigo: "CO", nombre: "Colombia", indicativo: "+57", bandera: "🇨🇴", lang: "es" },
-      { codigo: "MX", nombre: "México", indicativo: "+52", bandera: "🇲🇽", lang: "es" },
-      { codigo: "ES", nombre: "España", indicativo: "+34", bandera: "🇪🇸", lang: "es" },
-      { codigo: "AR", nombre: "Argentina", indicativo: "+54", bandera: "🇦🇷", lang: "es" },
-      { codigo: "CL", nombre: "Chile", indicativo: "+56", bandera: "🇨🇱", lang: "es" },
-      { codigo: "PE", nombre: "Perú", indicativo: "+51", bandera: "🇵🇪", lang: "es" },
-      { codigo: "EC", nombre: "Ecuador", indicativo: "+593", bandera: "🇪🇨", lang: "es" },
-      { codigo: "GT", nombre: "Guatemala", indicativo: "+502", bandera: "🇬🇹", lang: "es" },
-      { codigo: "CU", nombre: "Cuba", indicativo: "+53", bandera: "🇨🇺", lang: "es" },
-      { codigo: "BO", nombre: "Bolivia", indicativo: "+591", bandera: "🇧🇴", lang: "es" },
-      { codigo: "DO", nombre: "República Dominicana", indicativo: "+1", bandera: "🇩🇴", lang: "es" },
-      { codigo: "HN", nombre: "Honduras", indicativo: "+504", bandera: "HN", lang: "es" },
-      { codigo: "PY", nombre: "Paraguay", indicativo: "+595", bandera: "🇵🇾", lang: "es" },
-      { codigo: "SV", nombre: "El Salvador", indicativo: "+503", bandera: "🇸🇻", lang: "es" },
-      { codigo: "NI", nombre: "Nicaragua", indicativo: "+505", bandera: "🇳🇮", lang: "es" },
-      { codigo: "CR", nombre: "Costa Rica", indicativo: "+506", bandera: "🇨🇷", lang: "es" },
-      { codigo: "PA", nombre: "Panamá", indicativo: "+507", bandera: "🇵🇦", lang: "es" },
-      { codigo: "UY", nombre: "Uruguay", indicativo: "+598", bandera: "UY", lang: "es" },
-      { codigo: "PR", nombre: "Puerto Rico", indicativo: "+1", bandera: "🇵🇷", lang: "es" },
-      { codigo: "VE", nombre: "Venezuela", indicativo: "+58", bandera: "🇻🇪", lang: "es" },
-      { codigo: "US", nombre: "United States", indicativo: "+1", bandera: "🇺🇸", lang: "en" },
-      { codigo: "GB", nombre: "United Kingdom", indicativo: "+44", bandera: "🇬🇧", lang: "en" },
-      { codigo: "CA", nombre: "Canada", indicativo: "+1", bandera: "🇨🇦", lang: "en" },
-      { codigo: "AU", nombre: "Australia", indicativo: "+61", bandera: "🇦🇺", lang: "en" },
-      { codigo: "NZ", nombre: "New Zealand", indicativo: "+64", bandera: "🇳🇿", lang: "en" },
-      { codigo: "IE", nombre: "Ireland", indicativo: "+353", bandera: "🇮🇪", lang: "en" },
-      { codigo: "BR", nombre: "Brasil", indicativo: "+55", bandera: "🇧🇷", lang: "pt" },
-      { codigo: "FR", nombre: "France", indicativo: "+33", bandera: "🇫🇷", lang: "fr" },
-      { codigo: "DE", nombre: "Deutschland", indicativo: "+49", bandera: "🇩🇪", lang: "de" },
-      { codigo: "IT", nombre: "Italia", indicativo: "+39", bandera: "🇮🇹", lang: "it" },
-      { codigo: "JP", nombre: "日本 (Japan)", indicativo: "+81", bandera: "🇯🇵", lang: "ja" },
-      { codigo: "CN", nombre: "中国 (China)", indicativo: "+86", bandera: "🇨🇳", lang: "zh" }
+      { codigo: "CO", nombre: "Colombia", indicativo: "+57", bandera: "🇨🇴", lang: "es", moneda: "COP" },
+      { codigo: "MX", nombre: "México", indicativo: "+52", bandera: "🇲🇽", lang: "es", moneda: "MXN" },
+      { codigo: "ES", nombre: "España", indicativo: "+34", bandera: "🇪🇸", lang: "es", moneda: "EUR" },
+      { codigo: "AR", nombre: "Argentina", indicativo: "+54", bandera: "🇦🇷", lang: "es", moneda: "ARS" },
+      { codigo: "CL", nombre: "Chile", indicativo: "+56", bandera: "🇨🇱", lang: "es", moneda: "CLP" },
+      { codigo: "PE", nombre: "Perú", indicativo: "+51", bandera: "🇵🇪", lang: "es", moneda: "PEN" },
+      { codigo: "EC", nombre: "Ecuador", indicativo: "+593", bandera: "🇪🇨", lang: "es", moneda: "USD" },
+      { codigo: "GT", nombre: "Guatemala", indicativo: "+502", bandera: "🇬🇹", lang: "es", moneda: "GTQ" },
+      { codigo: "CU", nombre: "Cuba", indicativo: "+53", bandera: "🇨🇺", lang: "es", moneda: "CUP" },
+      { codigo: "BO", nombre: "Bolivia", indicativo: "+591", bandera: "🇧🇴", lang: "es", moneda: "BOB" },
+      { codigo: "DO", nombre: "República Dominicana", indicativo: "+1", bandera: "🇩🇴", lang: "es", moneda: "DOP" },
+      { codigo: "HN", nombre: "Honduras", indicativo: "+504", bandera: "🇭🇳", lang: "es", moneda: "HNL" },
+      { codigo: "PY", nombre: "Paraguay", indicativo: "+595", bandera: "🇵🇾", lang: "es", moneda: "PYG" },
+      { codigo: "SV", nombre: "El Salvador", indicativo: "+503", bandera: "🇸🇻", lang: "es", moneda: "USD" },
+      { codigo: "NI", nombre: "Nicaragua", indicativo: "+505", bandera: "🇳🇮", lang: "es", moneda: "NIO" },
+      { codigo: "CR", nombre: "Costa Rica", indicativo: "+506", bandera: "🇨🇷", lang: "es", moneda: "CRC" },
+      { codigo: "PA", nombre: "Panamá", indicativo: "+507", bandera: "🇵🇦", lang: "es", moneda: "PAB" },
+      { codigo: "UY", nombre: "Uruguay", indicativo: "+598", bandera: "🇺🇾", lang: "es", moneda: "UYU" },
+      { codigo: "PR", nombre: "Puerto Rico", indicativo: "+1", bandera: "🇵🇷", lang: "es", moneda: "USD" },
+      { codigo: "VE", nombre: "Venezuela", indicativo: "+58", bandera: "🇻🇪", lang: "es", moneda: "VES" },
+      { codigo: "US", nombre: "United States", indicativo: "+1", bandera: "🇺🇸", lang: "en", moneda: "USD" },
+      { codigo: "GB", nombre: "United Kingdom", indicativo: "+44", bandera: "🇬🇧", lang: "en", moneda: "GBP" },
+      { codigo: "CA", nombre: "Canada", indicativo: "+1", bandera: "🇨🇦", lang: "en", moneda: "CAD" },
+      { codigo: "AU", nombre: "Australia", indicativo: "+61", bandera: "🇦🇺", lang: "en", moneda: "AUD" },
+      { codigo: "NZ", nombre: "New Zealand", indicativo: "+64", bandera: "🇳🇿", lang: "en", moneda: "NZD" },
+      { codigo: "IE", nombre: "Ireland", indicativo: "+353", bandera: "🇮🇪", lang: "en", moneda: "EUR" },
+      { codigo: "BR", nombre: "Brasil", indicativo: "+55", bandera: "🇧🇷", lang: "pt", moneda: "BRL" },
+      { codigo: "FR", nombre: "France", indicativo: "+33", bandera: "🇫🇷", lang: "fr", moneda: "EUR" },
+      { codigo: "DE", nombre: "Deutschland", indicativo: "+49", bandera: "🇩🇪", lang: "de", moneda: "EUR" },
+      { codigo: "IT", nombre: "Italia", indicativo: "+39", bandera: "🇮🇹", lang: "it", moneda: "EUR" },
+      { codigo: "JP", nombre: "日本", indicativo: "+81", bandera: "🇯🇵", lang: "ja", moneda: "JPY" },
+      { codigo: "CN", nombre: "中国", indicativo: "+86", bandera: "🇨🇳", lang: "zh", moneda: "CNY" }
     ];
 
     const textosIdiomas = {
@@ -904,7 +907,7 @@
     btnThemeToggle.addEventListener('click', () => {
       temaActual = (temaActual === 'light') ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', temaActual);
-      btnThemeToggle.textContent = (temaActual === 'light') ? '☀️ Claro' : '🌙 Oscuro';
+      btnThemeToggle.textContent = (temaActual === 'light') ? '☀️' : '🌙';
     });
 
     const btnCountrySelect = document.getElementById('btnCountrySelect');
@@ -928,7 +931,7 @@
 
     function seleccionarPais(pais) {
       paisActivo = pais;
-      btnCountrySelect.textContent = `${pais.bandera} ${pais.nombre} (${pais.indicativo}) ▾`;
+      btnCountrySelect.textContent = `${pais.bandera} ${pais.nombre} ▾`;
       document.getElementById('phonePrefixLabel').textContent = pais.indicativo;
       countryDropdown.classList.remove('open');
       aplicarIdioma(pais.lang === 'es' || pais.lang === 'en' ? pais.lang : 'en');
@@ -1018,7 +1021,9 @@
       const countryCode = locale.includes('-') ? locale.split('-')[1].toUpperCase() : '';
 
       paisNativoDetectado = catalogoPaises.find(p => p.codigo === countryCode) || catalogoPaises.find(p => p.lang === langCode) || catalogoPaises[0];
-      document.getElementById('btnNativeCountry').textContent = `${paisNativoDetectado.bandera} ${paisNativoDetectado.nombre}`;
+      
+      const codigoIdiomaNativo = (paisNativoDetectado.lang || langCode || 'es').toUpperCase();
+      document.getElementById('btnNativeCountry').textContent = `${paisNativoDetectado.bandera} ${codigoIdiomaNativo}`;
       
       const idiomaFinal = (textosIdiomas[langCode]) ? langCode : 'en';
       aplicarIdioma(idiomaFinal);
