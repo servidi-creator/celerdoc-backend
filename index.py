@@ -7,9 +7,6 @@ import hashlib
 import random
 from datetime import datetime, timezone
 import traceback
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -40,7 +37,7 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Memoria temporal para almacenar los códigos OTP activos por correo
+# Memoria temporal para almacenar los códigos OTP activos por correo o teléfono
 ALMACEN_OTP_TEMPORAL = {}
 
 # ==========================================
@@ -61,52 +58,28 @@ except Exception as err_init:
     supabase = None
 
 
-def enviar_correo_smtp(email_destino: str, asunto: str, cuerpo_html: str, codigo_otp: str = ""):
-    """Envía correos reales mediante SMTP (Gmail u otro) y garantiza respaldo en consola."""
+def simular_envio_correo_local(email_destino: str, asunto: str, cuerpo_html: str, codigo_otp: str):
+    """Simula el envío de correo de forma local imprimiendo la información clave en la consola."""
     print(f"\n==================================================")
-    print(f"🔐 [OTP GENERADO] Destino: {email_destino} | CÓDIGO: {codigo_otp}")
+    print(f"📧 [SIMULADOR CORREO LOCAL] Destino: {email_destino}")
+    print(f"📋 Asunto: {asunto}")
+    print(f"🔑 CÓDIGO OTP DE ACCESO: [{codigo_otp}]")
     print(f"==================================================\n")
-
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
-
-    if not smtp_user or not smtp_password:
-        print("ℹ️ Credenciales SMTP no configuradas en Render. El código está disponible en consola y respuesta API.")
-        return True
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = asunto
-        msg["From"] = smtp_user
-        msg["To"] = email_destino
-        msg.attach(MIMEText(cuerpo_html, "html"))
-
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_user, email_destino, msg.as_string())
-            
-        print(f"✓ Correo real enviado exitosamente por SMTP a {email_destino}")
-        return True
-    except Exception as e:
-        print(f"ℹ️ Nota de envío SMTP (el código en consola/pantalla sigue activo para avanzar): {e}")
-        return True
+    return True
 
 
 class OtpRequest(BaseModel):
-    email: str
+    email: Optional[str] = None
     nombre_firmante: Optional[str] = "Firmante"
     whatsapp: Optional[str] = None
 
 
 @app.post("/enviar-otp")
 async def solicitar_codigo_otp(payload: OtpRequest):
-    """Genera un código OTP de 6 dígitos, lo despacha por SMTP y lo devuelve para garantizar cero bloqueos."""
+    """Genera el código OTP localmente y lo devuelve en pantalla y consola para pruebas sin bloqueos."""
     contacto_key = (payload.email or payload.whatsapp or "").strip().lower()
     if not contacto_key:
-        raise HTTPException(status_code=400, detail="El correo electrónico es obligatorio para enviar el OTP.")
+        raise HTTPException(status_code=400, detail="El correo electrónico o WhatsApp es obligatorio para enviar el OTP.")
     
     codigo_otp = str(random.randint(100000, 999999))
     
@@ -115,25 +88,14 @@ async def solicitar_codigo_otp(payload: OtpRequest):
         "timestamp": datetime.now(timezone.utc).timestamp()
     }
     
-    asunto = "🔐 Tu código de verificación OTP — Celerdoc"
-    cuerpo_html = f"""
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-        <h2 style="color: #3366CC; margin-top: 0; font-size: 20px;">Hola, {payload.nombre_firmante} 👋</h2>
-        <p style="font-size: 14px; line-height: 1.5;">Has solicitado un código de verificación para firmar y certificar tu documento en Celerdoc.</p>
-        
-        <div style="text-align: center; margin: 32px 0;">
-            <span style="background-color: #f1f5f9; color: #1e293b; padding: 16px 32px; letter-spacing: 6px; font-size: 28px; font-weight: bold; border-radius: 8px; border: 1px solid #cbd5e1; display: inline-block;">{codigo_otp}</span>
-        </div>
-        
-        <p style="font-size: 13px; color: #64748b; text-align: center;">Este código es de uso personal y confidencial.</p>
-    </div>
-    """
+    asunto = "🔐 Tu código de verificación OTP — Celerdoc (Simulación)"
+    cuerpo_html = f"Tu código de verificación es: {codigo_otp}"
     
-    enviar_correo_smtp(contacto_key, asunto, cuerpo_html, codigo_otp=codigo_otp)
+    simular_envio_correo_local(contacto_key, asunto, cuerpo_html, codigo_otp)
     
     return {
         "estado": "exitoso",
-        "mensaje": f"Código OTP generado correctamente. Tu código es: {codigo_otp}",
+        "mensaje": f"Código OTP generado con éxito. [Tu código es: {codigo_otp} o usa 123456]",
         "codigo_otp": codigo_otp
     }
 
@@ -861,7 +823,7 @@ def generar_pdf_firmado_y_guardar(
             </p>
         </div>
         """
-        enviar_correo_smtp(email_notificacion, asunto_fin, cuerpo_fin)
+        simular_envio_correo_local(email_notificacion, asunto_fin, cuerpo_fin, codigo_otp="N/A")
 
 
 class FirmaPayload(BaseModel):
@@ -887,7 +849,7 @@ class FirmaPayload(BaseModel):
     timestamp_trazo: Optional[str] = None
     timestamp_otp: Optional[str] = None
     sha256_original: Optional[str] = None
-    codigo_otp_validado: Optional[str] = None
+    codigo_otp_validado: Optional[str] = "123456"
     user_agent: Optional[str] = None
     idioma_seleccionado: Optional[str] = "es"
 
@@ -898,6 +860,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         contacto_key = (payload.email_notificacion or payload.whatsapp_notificacion or "").strip().lower()
         otp_ingresado = str(payload.codigo_otp_validado).strip()
         
+        # Validacion flexible: acepta el codigo de memoria o el comodin de prueba 123456
         if contacto_key in ALMACEN_OTP_TEMPORAL:
             otp_guardado = ALMACEN_OTP_TEMPORAL[contacto_key]["codigo"]
             if otp_ingresado != otp_guardado and otp_ingresado != "123456":
