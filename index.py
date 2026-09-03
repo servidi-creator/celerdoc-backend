@@ -743,7 +743,7 @@ def generar_pdf_firmado_y_guardar(
         except Exception as err_storage:
             print(f"❌ Error al subir a Supabase Storage: {err_storage}")
 
-    # Guardar metadatos de auditoría en Supabase SQL con clave primaria correcta
+    # Guardar metadatos de auditoría en Supabase SQL (sin el campo conflictivo de idioma)
     guardar_registro_auditoria({
         "hash_pkcs7_corto": hash_corto,
         "sig": reporte_id_unico,
@@ -769,8 +769,7 @@ def generar_pdf_firmado_y_guardar(
         "ts_trazo": ts_trazo,
         "ts_otp": ts_otp,
         "ip_enmascarada": ip_real,
-        "gps_enmascarado": gps_real,
-        "idioma_reporte": idioma_reporte
+        "gps_enmascarado": gps_real
     })
 
 
