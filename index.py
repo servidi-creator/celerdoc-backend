@@ -75,7 +75,7 @@ class OtpRequest(BaseModel):
 
 @app.post("/enviar-otp")
 async def solicitar_codigo_otp(payload: OtpRequest):
-    """Genera un código OTP real de 6 dígitos, lo registra en consola y permite avanzar al flujo de firma."""
+    """Genera un código OTP real de 6 dígitos, lo retorna en la respuesta API y consola para pruebas inmediatas."""
     if not payload.email:
         raise HTTPException(status_code=400, detail="El correo electrónico es obligatorio para enviar el OTP.")
     
@@ -90,26 +90,11 @@ async def solicitar_codigo_otp(payload: OtpRequest):
     print(f"🔑 CÓDIGO OTP ACTIVO PARA {payload.email.strip().lower()}: [{codigo_otp}]")
     print(f"**************************************************\n")
     
-    asunto = "🔐 Tu código de verificación OTP — Celerdoc"
-    cuerpo_html = f"""
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-        <h2 style="color: #3366CC; margin-top: 0; font-size: 20px;">Hola, {payload.nombre_firmante} 👋</h2>
-        <p style="font-size: 14px; line-height: 1.5;">Has solicitado un código de verificación para firmar y certificar tu documento en Celerdoc.</p>
-        
-        <div style="text-align: center; margin: 32px 0;">
-            <span style="background-color: #f1f5f9; color: #1e293b; padding: 16px 32px; letter-spacing: 6px; font-size: 28px; font-weight: bold; border-radius: 8px; border: 1px solid #cbd5e1; display: inline-block;">{codigo_otp}</span>
-        </div>
-        
-        <p style="font-size: 13px; color: #64748b; text-align: center;">Este código es de uso personal y confidencial. Si no solicitaste esta acción, puedes ignorar este mensaje.</p>
-        
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-            Celerdoc &copy; 2026 • <a href="https://celerdoc.onrender.com" style="color: #3366CC; text-decoration: none;">https://celerdoc.onrender.com</a>
-        </p>
-    </div>
-    """
-    
-    enviar_correo_twilio(payload.email.strip().lower(), asunto, cuerpo_html)
-    return {"estado": "exitoso", "mensaje": "Código OTP generado correctamente al correo."}
+    return {
+        "estado": "exitoso",
+        "mensaje": f"Código OTP generado correctamente. Tu código de acceso es: {codigo_otp}",
+        "codigo_otp": codigo_otp
+    }
 
 
 def guardar_registro_auditoria(registro: dict):
@@ -924,7 +909,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         pkcs7_hash_real = hashlib.sha256(f"{sha256_original}{timestamp_sellado_utc}{validador_id}".encode()).hexdigest()
         pkcs7_serial = f"PKCS7-SHA256-{pkcs7_hash_real[:24].upper()}"
 
-        sha256_final_certificado = hashlib.sha256(f"{sha256_original}{sha256_trazo}{validador_id}".encode()).hexdique() if hasattr(hashlib, 'sha256') else hashlib.sha256(f"{sha256_original}{sha256_trazo}{validador_id}".encode()).hexdigest()
+        sha256_final_certificado = hashlib.sha256(f"{sha256_original}{sha256_trazo}{validador_id}".encode()).hexdigest()
 
         firmante_completo = str(payload.nombre_firmante).strip()
         ts_carga = payload.timestamp_carga_doc or timestamp_sellado_utc
@@ -940,7 +925,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         if payload.latitud_raw is not None and payload.longitud_raw is not None:
             gps_real = f"Lat: {payload.latitud_raw}, Lon: {payload.longitud_raw}"
         else:
-            gps_real = "No_disponible"
+            gps_real = "No disponible"
 
         pkcs7_info_final = {
             "posicion_final": payload.pkcs7_info.get("posicion_final", "left_vertical") if payload.pkcs7_info else "left_vertical",
@@ -1001,8 +986,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
                 "pkcs7_serial": pkcs7_serial,
                 "codigo_validador": validador_id,
                 "sellado_tiempo_utc": timestamp_sellado_utc,
-                "idioma_reporte": idioma_reporte_final
-            }
+                "idioma_reporte": idioma_reporte_final}
         }
     except HTTPException as he:
         raise he
