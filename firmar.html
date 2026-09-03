@@ -470,7 +470,6 @@
 
       <div class="right-controls">
         <button class="btn-control" id="btnForceEn" title="English">🇺🇸 EN</button>
-        <button class="btn-control" id="btnForceJa" title="日本語">🇯🇵 JA</button>
         <button class="btn-control" id="btnNativeCountry" title="Idioma local">🇨🇴 ES</button>
         
         <div class="country-selector-wrap">
@@ -503,19 +502,19 @@
       
       <div class="form-group">
         <label for="nombreTitular" id="lblNombreTitular">Nombre Completo *</label>
-        <input type="text" id="nombreTitular" placeholder="Ej. Juan Pérez">
+        <input type="text" id="nombreTitular" placeholder="">
         <div class="error-msg-field" id="errNombre">Nombre obligatorio (mínimo 3 caracteres)</div>
       </div>
       
       <div class="form-group">
         <label for="numDoc" id="lblNumDoc">Nº de Documento *</label>
-        <input type="text" id="numDoc" placeholder="Ej. 12345678">
+        <input type="text" id="numDoc" placeholder="">
         <div class="error-msg-field" id="errNumDoc">Documento obligatorio (mínimo 4 caracteres)</div>
       </div>
       
       <div class="form-group">
         <label for="emailNotif" id="lblEmail">Correo Electrónico *</label>
-        <input type="email" id="emailNotif" placeholder="ejemplo@correo.com">
+        <input type="email" id="emailNotif" placeholder="">
         <div class="error-msg-field" id="errEmail">Formato de correo inválido</div>
       </div>
       
@@ -523,7 +522,7 @@
         <label for="whatsappNotif" id="lblWhatsapp">Celular / WhatsApp *</label>
         <div class="phone-input-wrap" id="wrapPhone">
           <span class="phone-prefix" id="phonePrefixLabel">+57</span>
-          <input type="text" id="whatsappNotif" maxlength="15" placeholder="3001234567">
+          <input type="text" id="whatsappNotif" maxlength="15" placeholder="">
         </div>
         <div class="error-msg-field" id="errPhone">Solo números (mínimo 7 dígitos)</div>
       </div>
@@ -715,7 +714,6 @@
       { codigo: "FR", nombre: "France", indicativo: "+33", bandera: "🇫🇷", lang: "fr", moneda: "EUR" },
       { codigo: "DE", nombre: "Deutschland", indicativo: "+49", bandera: "🇩🇪", lang: "de", moneda: "EUR" },
       { codigo: "IT", nombre: "Italia", indicativo: "+39", bandera: "🇮🇹", lang: "it", moneda: "EUR" },
-      { codigo: "JP", nombre: "日本", indicativo: "+81", bandera: "🇯🇵", lang: "ja", moneda: "JPY" },
       { codigo: "CN", nombre: "中国", indicativo: "+86", bandera: "🇨🇳", lang: "zh", moneda: "CNY" }
     ];
 
@@ -729,10 +727,6 @@
         lblEmail: "Correo Electrónico *",
         lblWhatsapp: "Celular / WhatsApp *",
         lblTerms: "Acepto los Términos, Condiciones y Política de Privacidad de Celerdoc.",
-        phNombre: "Ej. Juan Pérez",
-        phNumDoc: "Ej. 12345678",
-        phEmail: "ejemplo@correo.com",
-        phWhatsapp: "3001234567",
         errNombre: "Nombre obligatorio (mínimo 3 caracteres)",
         errNumDoc: "Documento obligatorio (mínimo 4 caracteres)",
         errEmail: "Formato de correo inválido",
@@ -790,10 +784,6 @@
         lblEmail: "Corporate Email *",
         lblWhatsapp: "Mobile / WhatsApp *",
         lblTerms: "I accept Celerdoc Terms, Conditions, and Privacy Policy.",
-        phNombre: "e.g. John Doe",
-        phNumDoc: "e.g. 12345678",
-        phEmail: "example@email.com",
-        phWhatsapp: "5551234567",
         errNombre: "Name is required (minimum 3 characters)",
         errNumDoc: "Document ID is required (minimum 4 characters)",
         errEmail: "Invalid email format",
@@ -840,67 +830,6 @@
           { val: "PAS", text: "PAS - Passport" },
           { val: "PER", text: "PER - Special Permit / Work Visa" },
           { val: "OTR", text: "OTR - Other Official Document" }
-        ]
-      },
-      ja: {
-        titulo: "Celerdoc — 文書署名",
-        desc: "オリジナル文書をアップロードし、署名位置を指定し、必要事項を入力して署名またはスタンプを追加し、認定済み文書を生成します。",
-        lblTipoDoc: "身分証明書の種類 *",
-        lblNombreTitular: "署名者の氏名 *",
-        lblNumDoc: "身分証明書番号 *",
-        lblEmail: "企業メールアドレス *",
-        lblWhatsapp: "携帯電話 / WhatsApp *",
-        lblTerms: "Celerdocの利用規約およびプライバシーポリシーに同意します。",
-        phNombre: "例: 山田 太郎",
-        phNumDoc: "例: 12345678",
-        phEmail: "example@email.com",
-        phWhatsapp: "9012345678",
-        errNombre: "氏名は必須です（3文字以上）",
-        errNumDoc: "身分証明書番号は必須です（4文字以上）",
-        errEmail: "無効なメール形式です",
-        errPhone: "数字のみ（7桁から15桁）",
-        btnAccion: "署名する文書を挿入",
-        btnReemplazar: "文書を置換",
-        dropSubtitle: "PDFファイルをここにクリック、ドラッグ、または貼り付け (Ctrl+V)",
-        lblBtnFirmar: "✍️ 署名",
-        modalFirmaTitulo: "署名を描画または挿入",
-        tabDibujar: "✍️ 手書き署名",
-        tabImagen: "🖼️ 画像をアップロード",
-        padPlaceholder: "ここに署名を描画してください",
-        btnSelectImg: "📂 画像ファイルを選択",
-        txtImgFormats: "対応形式: PNG, JPG, WEBP, SVG（背景透過を推奨）",
-        txtScaleAdjust: "スケール調整:",
-        btnChangeImg: "画像を変更",
-        btnClearSig: "クリア / リセット",
-        btnCancelSig: "キャンセル",
-        btnConfirmSig: "署名して続行",
-        otpTitulo: "OTPによる本人確認",
-        btnConfirmarOtp: "コードを確認",
-        btnCancelarOtp: "キャンセル",
-        btnDescargar: "📥 新しい署名済みPDFをダウンロード",
-        sugeridosTitulo: "おすすめのトップ20カ国",
-        verTodos: "その他の国（全カタログ）...",
-        zoomIn: "🔍 拡大",
-        zoomOut: "🔍 縮小",
-        first: "最初",
-        prev: "前へ",
-        next: "次へ",
-        last: "最後",
-        pageText: "ページ",
-        ofText: "/",
-        downloadReader: "📥 オリジナル文書をダウンロード",
-        badgeActive: "有効 / オリジナル文書ページ",
-        successTitle: "署名が正常に完了しました！",
-        successSubtitle: "文書には完全な法的効力を持って署名されました。",
-        btnFirmarNuevo: "🔄 別の文書に署名する",
-        btnSalirSesion: "❌ 終了",
-        docs: [
-          { val: "CC", text: "CC - マイナンバーカード / 身分証明書" },
-          { val: "CE", text: "CE - 在留カード" },
-          { val: "NIT", text: "NIT - 法人番号 / 納税者番号" },
-          { val: "PAS", text: "PAS - パスポート" },
-          { val: "PER", text: "PER - 特別活動許可 / 就労ビザ" },
-          { val: "OTR", text: "OTR - その他の公式文書" }
         ]
       }
     };
@@ -1046,7 +975,7 @@
       btnCountrySelect.textContent = `${pais.bandera} ${pais.nombre} ▾`;
       document.getElementById('phonePrefixLabel').textContent = pais.indicativo;
       countryDropdown.classList.remove('open');
-      aplicarIdioma(pais.lang === 'es' || pais.lang === 'en' || pais.lang === 'ja' ? pais.lang : 'en');
+      aplicarIdioma(pais.lang === 'es' || pais.lang === 'en' ? pais.lang : 'en');
     }
 
     function renderSelectorPaises() {
@@ -1085,10 +1014,10 @@
       document.getElementById('lblWhatsapp').textContent = t.lblWhatsapp;
       document.getElementById('lblTerms').textContent = t.lblTerms;
       
-      inputNombre.placeholder = t.phNombre;
-      inputNumDoc.placeholder = t.phNumDoc;
-      inputEmail.placeholder = t.phEmail;
-      inputPhone.placeholder = t.phWhatsapp;
+      inputNombre.placeholder = "";
+      inputNumDoc.placeholder = "";
+      inputEmail.placeholder = "";
+      inputPhone.placeholder = "";
 
       errNombre.textContent = t.errNombre;
       errNumDoc.textContent = t.errNumDoc;
@@ -1155,11 +1084,6 @@
     document.getElementById('btnForceEn').addEventListener('click', () => {
       const paisUs = catalogoPaises.find(p => p.codigo === 'US');
       if (paisUs) seleccionarPais(paisUs);
-    });
-
-    document.getElementById('btnForceJa').addEventListener('click', () => {
-      const paisJp = catalogoPaises.find(p => p.codigo === 'JP');
-      if (paisJp) seleccionarPais(paisJp);
     });
 
     document.getElementById('btnNativeCountry').addEventListener('click', () => {

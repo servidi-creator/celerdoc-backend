@@ -55,40 +55,39 @@ except Exception as err_init:
 
 
 def guardar_registro_auditoria(registro: dict):
-    """Guarda de forma persistente todos los metadatos de auditoría con clave única por transacción."""
+    """Guarda de forma persistente todos los metadatos de auditoría usando reporte_id_unico como clave única."""
     if not supabase:
         print("ADVERTENCIA: Cliente Supabase no disponible.")
         return None
 
     try:
-        if not registro.get("sig"):
-            registro["sig"] = registro.get("reporte_id_unico") or f"CELER-{uuid.uuid4().hex[:8]}"
-
         if not registro.get("reporte_id_unico"):
-            registro["reporte_id_unico"] = registro["sig"]
+            registro["reporte_id_unico"] = registro.get("sig") or f"CELER-{uuid.uuid4().hex[:8]}"
+
+        if not registro.get("sig"):
+            registro["sig"] = registro["reporte_id_unico"]
 
         if not registro.get("firmante_registrado") and registro.get("nombre_firmante"):
             registro["firmante_registrado"] = registro["nombre_firmante"]
 
-        print(f"\n[SUPABASE] Guardando registro único:")
-        print(f" -> ID Reporte: {registro.get('sig')}")
+        print(f"\n[SUPABASE] Guardando registro único en SQL:")
+        print(f" -> ID Reporte: {registro.get('reporte_id_unico')}")
         print(f" -> Firmante: {registro.get('nombre_firmante')}")
         print(f" -> Documento: {registro.get('tipo_documento')} {registro.get('numero_documento')}")
         print(f" -> Email: {registro.get('email_notificacion')}")
         print(f" -> WhatsApp: {registro.get('whatsapp_notificacion')}")
-        print(f" -> Idioma: {registro.get('idioma_reporte', 'es')}")
 
-        res = supabase.table("auditoria").upsert(registro, on_conflict="sig").execute()
-        print("✓ ¡REGISTRO GUARDADO EN SUPABASE CON ÉXITO!")
+        res = supabase.table("auditoria").upsert(registro, on_conflict="reporte_id_unico").execute()
+        print("✓ ¡REGISTRO GUARDADO EN SUPABASE SQL CON ÉXITO!")
         return res
     except Exception as e:
-        print(f"Aviso en upsert, reintentando insert: {e}")
+        print(f"Aviso en upsert SQL, reintentando insert: {e}")
         try:
             res = supabase.table("auditoria").insert(registro).execute()
-            print("✓ ¡REGISTRO GUARDADO EN SUPABASE (INSERT) CON ÉXITO!")
+            print("✓ ¡REGISTRO GUARDADO EN SUPABASE SQL (INSERT) CON ÉXITO!")
             return res
         except Exception as e2:
-            print(f"❌ ERROR CRÍTICO AL GUARDAR EN SUPABASE: {e2}")
+            print(f"❌ ERROR CRÍTICO AL GUARDAR EN SUPABASE SQL: {e2}")
             return None
 
 
@@ -97,7 +96,9 @@ def consultar_registro_auditoria(sig: str) -> Optional[dict]:
     if not supabase:
         return None
     try:
-        response = supabase.table("auditoria").select("*").eq("sig", sig).execute()
+        response = supabase.table("auditoria").select("*").eq("reporte_id_unico", sig).execute()
+        if not response.data or len(response.data) == 0:
+            response = supabase.table("auditoria").select("*").eq("sig", sig).execute()
         if response.data and len(response.data) > 0:
             return response.data[0]
     except Exception as e:
@@ -120,7 +121,6 @@ async def descargar_documento_firmado(nombre_archivo: str):
         raise HTTPException(status_code=500, detail="Servicio de almacenamiento no disponible.")
     
     try:
-        # Descarga el archivo desde el bucket privado 'documentos-firmados'
         response = supabase.storage.from_("documentos-firmados").download(nombre_archivo)
         if not response:
             raise HTTPException(status_code=404, detail="El archivo solicitado no existe en el almacenamiento.")
@@ -492,8 +492,6 @@ def formatear_gps_reporte_desde_cadena(gps_cadena: str, lang: str = "es") -> str
     """Procesa una cadena 'Lat: X, Lon: Y' y enmascara cada componente respetando la regla."""
     if lang == "en":
         txt_no_disp = "Not available / Not provided"
-    elif lang == "ja":
-        txt_no_disp = "利用不可 / 提供されていません"
     else:
         txt_no_disp = "No disponible / No proporcionado"
         
@@ -578,7 +576,7 @@ def generar_pdf_firmado_y_guardar(
     pagina_auditoria = doc.new_page(width=595, height=842)
     color_azul_corp = (0.2, 0.4, 0.8)
 
-    # DICCIONARIO MULTILINGÜE PARA EL REPORTE DE AUDITORIA EN PDF (ES, EN, JA)
+    # DICCIONARIO MULTILINGÜE PARA EL REPORTE DE AUDITORIA EN PDF (ES, EN)
     t_pdf = {
         "es": {
             "titulo": "Celerdoc: Reporte de Auditoria y Trazabilidad",
@@ -657,45 +655,6 @@ def generar_pdf_firmado_y_guardar(
             "aviso1": "• Transparency: IP and GPS coordinate records are securely stored with exact values for auditing.",
             "aviso2": "• Legal backing: Original audit records remain preserved under Celerdoc digital security standards.",
             "pie": f"Certificate issued by Celerdoc | Final Hash: {sha256_final_certificado[:32]}..."
-        },
-        "ja": {
-            "titulo": "Celerdoc: 監査証跡およびトレーサビリティレポート",
-            "subtitulo": "電子的な完全性、否認防止、およびデジタル認証の証拠",
-            "id_registro": f"レコードID:  {reporte_id_unico}",
-            "total_pags": f"{len(doc)}ページ (監査証跡シートを含む)",
-            "filas": {
-                "doc_orig": "オリジナル文書",
-                "doc_fin": "認定済み最終文書",
-                "firmante": "認定署名者",
-                "id_firmante": "署名者の身分証明",
-                "canales": "通知チャネル",
-                "terms": "利用規約およびプライバシーポリシーの同意",
-                "sha_orig": "オリジナル文書 SHA-256",
-                "sha_fin": "署名済み文書 SHA-256",
-                "hash_trazo": "生体認証ストロークハッシュ",
-                "pkcs_serial": "PKCS#7署名コンテナ",
-                "pkcs_hash": "PKCS#7デジタルハッシュスタンプ",
-                "validador": "トランザクション検証コード",
-                "otp_enviado": "送信および検証済みOTPコード",
-                "otp_val": "OTPの同意と検証",
-                "ip": "署名者のIPアドレス",
-                "gps": "GPS位置情報",
-                "ubicacion": "文書上の署名シールの配置",
-                "tot_pags": "総認定ページ数",
-                "sellado": "最終完全性タイムスタンプ (UTC)"
-            },
-            "cargado": "アップロード日時:",
-            "aceptado_terms": "署名者による明示的な同意",
-            "autenticado_otp": "正常に同意および認証されました",
-            "registrada": "登録日時:",
-            "capturada": "取得日時:",
-            "pagina": "ページ",
-            "qr_header": "完全性の検証および公開確認 (PKCS#7 / SHA-256)",
-            "qr_val": "コード値 / ハッシュ:",
-            "qr_link": "検証リンク:",
-            "aviso1": "• 透明性: IPアドレスおよびGPS座標の記録は、監査のために正確な値で安全に保管されます。",
-            "aviso2": "• 法的裏付け: 当初の監査記録はCelerdocのデジタルセキュリティ基準に基づいて厳重に保管されます。",
-            "pie": f"Celerdoc発行の証明書 | 最終ハッシュ: {sha256_final_certificado[:32]}..."
         }
     }
 
@@ -769,7 +728,6 @@ def generar_pdf_firmado_y_guardar(
     pagina_auditoria.draw_line(fitz.Point(42, 792), fitz.Point(553, 792), color=color_azul_corp, width=0.6)
     pagina_auditoria.insert_text(fitz.Point(42, 804), tr["pie"], fontsize=6, color=(0.4, 0.45, 0.5))
 
-    # Guardar PDF temporalmente en memoria para subirlo a Supabase Storage
     pdf_output_bytes = doc.tobytes()
     doc.close()
 
@@ -785,7 +743,7 @@ def generar_pdf_firmado_y_guardar(
         except Exception as err_storage:
             print(f"❌ Error al subir a Supabase Storage: {err_storage}")
 
-    # Guardar metadatos de auditoría en Supabase SQL
+    # Guardar metadatos de auditoría en Supabase SQL con clave primaria correcta
     guardar_registro_auditoria({
         "hash_pkcs7_corto": hash_corto,
         "sig": reporte_id_unico,
@@ -941,7 +899,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
 
         return {
             "estado": "exitoso",
-            "mensaje": "Documento firmado, auditado y certificado con éxito en Supabase Storage.",
+            "mensaje": "Documento firmado, auditado y certificado con éxito en Supabase SQL y Storage.",
             "datos_archivo": {
                 "nombre_final": nombre_final,
                 "ruta_descarga": f"/descargas/{nombre_final}"
