@@ -62,45 +62,49 @@ except Exception as err_init:
 
 
 def enviar_correo_twilio(email_destino: str, asunto: str, cuerpo_html: str):
-    """Envía correos electrónicos reales utilizando la API de Twilio."""
-    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    """Envía correos electrónicos utilizando la API oficial de Twilio / SendGrid."""
     auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-    remitente = os.getenv("TWILIO_SENDER_EMAIL")
+    remitente = os.getenv("TWILIO_SENDER_EMAIL", "soporte@celerdoc.com")
     
-    if not account_sid or not auth_token or not email_destino or not remitente:
-        print("ADVERTENCIA: Credenciales de Twilio o email de destino/remitente no configurados.")
+    if not auth_token or not email_destino:
+        print("ADVERTENCIA: Token de Twilio o email de destino no configurados.")
         return False
 
-    url = "https://comms.twilio.com/v1/Emails"
+    url = "https://api.sendgrid.com/v3/mail/send"
+    
+    correo_remitente = "soporte@celerdoc.com"
+    if remitente and "@" in remitente and "twilio.email" not in remitente:
+        correo_remitente = remitente
+
     payload = {
+        "personalizations": [{
+            "to": [{"email": email_destino}]
+        }],
         "from": {
-            "address": remitente,
+            "email": correo_remitente,
             "name": "Celerdoc Seguridad"
         },
-        "to": [{"address": email_destino}],
-        "content": {
-            "subject": asunto,
-            "html": cuerpo_html
-        }
+        "subject": asunto,
+        "content": [{
+            "type": "text/html",
+            "value": cuerpo_html
+        }]
     }
-
-    auth_str = f"{account_sid.strip()}:{auth_token.strip()}"
-    b64_auth = base64.b64encode(auth_str.encode()).decode()
 
     try:
         req = urllib.request.Request(
             url, 
             data=json.dumps(payload).encode('utf-8'), 
             headers={
-                "Authorization": f"Basic {b64_auth}",
+                "Authorization": f"Bearer {auth_token.strip()}",
                 "Content-Type": "application/json"
             }
         )
         with urllib.request.urlopen(req) as response:
-            print(f"✓ CORREO ENVIADO EXITOSAMENTE a {email_destino} vía Twilio API.")
+            print(f"✓ CORREO ENVIADO EXITOSAMENTE a {email_destino} vía Twilio.")
             return True
     except urllib.error.HTTPError as e:
-        error_body = e.read().decode('utf-8')
+        error_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
         print(f"❌ TWILIO RECHAZÓ EL ENVÍO (Error HTTP {e.code}): {error_body}")
         return False
     except Exception as e:
@@ -929,7 +933,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             otp_ingresado = str(payload.codigo_otp_validado).strip()
             
             if email_key in ALMACEN_OTP_TEMPORAL:
-                otp_guardado = ALMACEN_OTP_TEMPORAL[email_key]["codigo"]
+                otp_guardado = ALMACEN_OTP_TEMPORල්[email_key]["codigo"]
                 if otp_ingresado != otp_guardado and otp_ingresado != "123456":
                     raise HTTPException(status_code=400, detail="El código OTP ingresado es incorrecto.")
             else:
@@ -979,6 +983,8 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         client_ip = request.client.host if request.client else "186.84.92.145"
         ip_real = client_ip
         
+        id_firmante_gps = ... # handled above
+
         if payload.latitud_raw is not None and payload.longitud_raw is not None:
             gps_real = f"Lat: {payload.latitud_raw}, Lon: {payload.longitud_raw}"
         else:
