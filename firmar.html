@@ -674,9 +674,9 @@
                     window.location.hostname === '127.0.0.1';
     const API_URL = esLocal ? "http://127.0.0.1:8000" : window.location.origin;
 
-    const CODIGO_OTP_SIMULADO = "123456";
     const MAX_INTENTOS_OTP = 5;
     let intentosFallidosOTP = 0;
+    let codigoOtpGeneradoServer = "";
 
     let timestampCargaDocUtc = "";
     let timestampAceptacionTermsUtc = "";
@@ -1308,7 +1308,7 @@
       modalSignaturePad.style.display = 'none';
     });
 
-    btnConfirmSignatureModal.addEventListener('click', (e) => {
+    btnConfirmSignatureModal.addEventListener('click', async (e) => {
       e.stopPropagation();
       if (!haCompletadoTrazo) {
         alert("Por favor realice su trazo o cargue una imagen de su firma antes de continuar.");
@@ -1337,51 +1337,58 @@
       }
 
       modalSignaturePad.style.display = 'none';
-      
+
+      // ENVIAR SOLICITUD DE OTP REAL AL SERVIDOR VÍA TWILIO
+      const emailDestino = inputEmail.value.trim();
+      const nombreFirmante = inputNombre.value.trim();
       const tel = inputPhone.value.trim();
-      const email = inputEmail.value.trim();
       const ind = paisActivo.indicativo;
 
-      document.getElementById('otpDestinoMsg').innerHTML = `Código de seguridad enviado a: <strong>${ind} ${tel}</strong> / <strong>${email}</strong><br><br><span style="color: var(--brand-primary); font-weight: 600;">(Código de prueba: 123456)</span>`;
-      inputOtp.value = '';
-      otpErrorMsg.textContent = '';
-      modalOtp.style.display = 'flex';
-      setTimeout(() => inputOtp.focus(), 100);
+      try {
+        const respOtp = await fetch(`${API_URL}/enviar-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailDestino, nombre_firmante: nombreFirmante })
+        });
+
+        if (!respOtp.ok) {
+          const errData = await respOtp.json();
+          alert("No se pudo enviar el código OTP: " + (errData.detail || "Error desconocido"));
+          return;
+        }
+
+        document.getElementById('otpDestinoMsg').innerHTML = `Código de seguridad enviado a: <strong>${ind} ${tel}</strong> / <strong>${emailDestino}</strong><br><br><span style="color: var(--brand-primary); font-weight: 600;">(Revisa tu correo electrónico)</span>`;
+        inputOtp.value = '';
+        otpErrorMsg.textContent = '';
+        modalOtp.style.display = 'flex';
+        setTimeout(() => inputOtp.focus(), 100);
+
+      } catch (err) {
+        alert("Error de conexión al solicitar el código OTP: " + err.message);
+      }
     });
 
     function verificarYEjecutarOtp() {
       const codigo = inputOtp.value.trim();
       if (codigo.length === 6) {
-        if (codigo === CODIGO_OTP_SIMULADO) {
-          timestampOtpValidadoUtc = new Date().toISOString();
-          otpErrorMsg.textContent = '';
-          modalOtp.style.display = 'none';
-          
-          const formGrid = document.querySelector('.form-grid');
-          const termsWrap = document.getElementById('wrapTerms');
-          const dropAreaEl = document.getElementById('dropArea');
-          const navBarEl = document.getElementById('navBar');
-          const boxViewerEl = document.getElementById('boxViewer');
-          
-          if (formGrid) formGrid.style.display = 'none';
-          if (termsWrap) termsWrap.style.display = 'none';
-          if (dropAreaEl) dropAreaEl.style.display = 'none';
-          if (navBarEl) navBarEl.style.display = 'none';
-          if (boxViewerEl) boxViewerEl.style.display = 'none';
+        // Validación directa con el backend al procesar la firma
+        timestampOtpValidadoUtc = new Date().toISOString();
+        otpErrorMsg.textContent = '';
+        modalOtp.style.display = 'none';
+        
+        const formGrid = document.querySelector('.form-grid');
+        const termsWrap = document.getElementById('wrapTerms');
+        const dropAreaEl = document.getElementById('dropArea');
+        const navBarEl = document.getElementById('navBar');
+        const boxViewerEl = document.getElementById('boxViewer');
+        
+        if (formGrid) formGrid.style.display = 'none';
+        if (termsWrap) termsWrap.style.display = 'none';
+        if (dropAreaEl) dropAreaEl.style.display = 'none';
+        if (navBarEl) navBarEl.style.display = 'none';
+        if (boxViewerEl) boxViewerEl.style.display = 'none';
 
-          ejecutarProcesoFirmaBackend(codigo);
-        } else {
-          intentosFallidosOTP += 1;
-          const restantes = MAX_INTENTOS_OTP - intentosFallidosOTP;
-          if (intentosFallidosOTP >= MAX_INTENTOS_OTP) {
-            alert("Has superado el límite de 5 intentos fallidos. Por seguridad la sesión se cancelará.");
-            location.reload();
-          } else {
-            otpErrorMsg.textContent = `Código OTP incorrecto. Le quedan ${restantes} intento(s).`;
-            inputOtp.value = '';
-            inputOtp.focus();
-          }
-        }
+        ejecutarProcesoFirmaBackend(codigo);
       }
     }
 
