@@ -470,6 +470,7 @@
 
       <div class="right-controls">
         <button class="btn-control" id="btnForceEn" title="English">🇺🇸 EN</button>
+        <button class="btn-control" id="btnForceJa" title="日本語">🇯🇵 JA</button>
         <button class="btn-control" id="btnNativeCountry" title="Idioma local">🇨🇴 ES</button>
         
         <div class="country-selector-wrap">
@@ -840,6 +841,67 @@
           { val: "PER", text: "PER - Special Permit / Work Visa" },
           { val: "OTR", text: "OTR - Other Official Document" }
         ]
+      },
+      ja: {
+        titulo: "Celerdoc — 文書署名",
+        desc: "オリジナル文書をアップロードし、署名位置を指定し、必要事項を入力して署名またはスタンプを追加し、認定済み文書を生成します。",
+        lblTipoDoc: "身分証明書の種類 *",
+        lblNombreTitular: "署名者の氏名 *",
+        lblNumDoc: "身分証明書番号 *",
+        lblEmail: "企業メールアドレス *",
+        lblWhatsapp: "携帯電話 / WhatsApp *",
+        lblTerms: "Celerdocの利用規約およびプライバシーポリシーに同意します。",
+        phNombre: "例: 山田 太郎",
+        phNumDoc: "例: 12345678",
+        phEmail: "example@email.com",
+        phWhatsapp: "9012345678",
+        errNombre: "氏名は必須です（3文字以上）",
+        errNumDoc: "身分証明書番号は必須です（4文字以上）",
+        errEmail: "無効なメール形式です",
+        errPhone: "数字のみ（7桁から15桁）",
+        btnAccion: "署名する文書を挿入",
+        btnReemplazar: "文書を置換",
+        dropSubtitle: "PDFファイルをここにクリック、ドラッグ、または貼り付け (Ctrl+V)",
+        lblBtnFirmar: "✍️ 署名",
+        modalFirmaTitulo: "署名を描画または挿入",
+        tabDibujar: "✍️ 手書き署名",
+        tabImagen: "🖼️ 画像をアップロード",
+        padPlaceholder: "ここに署名を描画してください",
+        btnSelectImg: "📂 画像ファイルを選択",
+        txtImgFormats: "対応形式: PNG, JPG, WEBP, SVG（背景透過を推奨）",
+        txtScaleAdjust: "スケール調整:",
+        btnChangeImg: "画像を変更",
+        btnClearSig: "クリア / リセット",
+        btnCancelSig: "キャンセル",
+        btnConfirmSig: "署名して続行",
+        otpTitulo: "OTPによる本人確認",
+        btnConfirmarOtp: "コードを確認",
+        btnCancelarOtp: "キャンセル",
+        btnDescargar: "📥 新しい署名済みPDFをダウンロード",
+        sugeridosTitulo: "おすすめのトップ20カ国",
+        verTodos: "その他の国（全カタログ）...",
+        zoomIn: "🔍 拡大",
+        zoomOut: "🔍 縮小",
+        first: "最初",
+        prev: "前へ",
+        next: "次へ",
+        last: "最後",
+        pageText: "ページ",
+        ofText: "/",
+        downloadReader: "📥 オリジナル文書をダウンロード",
+        badgeActive: "有効 / オリジナル文書ページ",
+        successTitle: "署名が正常に完了しました！",
+        successSubtitle: "文書には完全な法的効力を持って署名されました。",
+        btnFirmarNuevo: "🔄 別の文書に署名する",
+        btnSalirSesion: "❌ 終了",
+        docs: [
+          { val: "CC", text: "CC - マイナンバーカード / 身分証明書" },
+          { val: "CE", text: "CE - 在留カード" },
+          { val: "NIT", text: "NIT - 法人番号 / 納税者番号" },
+          { val: "PAS", text: "PAS - パスポート" },
+          { val: "PER", text: "PER - 特別活動許可 / 就労ビザ" },
+          { val: "OTR", text: "OTR - その他の公式文書" }
+        ]
       }
     };
 
@@ -984,13 +1046,13 @@
       btnCountrySelect.textContent = `${pais.bandera} ${pais.nombre} ▾`;
       document.getElementById('phonePrefixLabel').textContent = pais.indicativo;
       countryDropdown.classList.remove('open');
-      aplicarIdioma(pais.lang === 'es' || pais.lang === 'en' ? pais.lang : 'en');
+      aplicarIdioma(pais.lang === 'es' || pais.lang === 'en' || pais.lang === 'ja' ? pais.lang : 'en');
     }
 
     function renderSelectorPaises() {
       listSuggested.innerHTML = '';
       listAllCountries.innerHTML = '';
-      const sugeridos = catalogoPaises.filter(p => p.lang === idiomaActivo).slice(0, 20);
+      const sugeridos = catalogoPaises.filter(p => p.lang === idiomaActivo || p.lang === 'es' || p.lang === 'en').slice(0, 20);
       const otros = catalogoPaises.filter(p => !sugeridos.includes(p));
 
       sugeridos.forEach(p => {
@@ -1023,13 +1085,11 @@
       document.getElementById('lblWhatsapp').textContent = t.lblWhatsapp;
       document.getElementById('lblTerms').textContent = t.lblTerms;
       
-      // Placeholders / Prompts de llenado
       inputNombre.placeholder = t.phNombre;
       inputNumDoc.placeholder = t.phNumDoc;
       inputEmail.placeholder = t.phEmail;
       inputPhone.placeholder = t.phWhatsapp;
 
-      // Mensajes de error en formulario
       errNombre.textContent = t.errNombre;
       errNumDoc.textContent = t.errNumDoc;
       errEmail.textContent = t.errEmail;
@@ -1095,6 +1155,11 @@
     document.getElementById('btnForceEn').addEventListener('click', () => {
       const paisUs = catalogoPaises.find(p => p.codigo === 'US');
       if (paisUs) seleccionarPais(paisUs);
+    });
+
+    document.getElementById('btnForceJa').addEventListener('click', () => {
+      const paisJp = catalogoPaises.find(p => p.codigo === 'JP');
+      if (paisJp) seleccionarPais(paisJp);
     });
 
     document.getElementById('btnNativeCountry').addEventListener('click', () => {
@@ -1368,7 +1433,6 @@
           otpErrorMsg.textContent = '';
           modalOtp.style.display = 'none';
           
-          // OCULTAR CAMPOS, DROPZONE Y VISOR TRAS VALIDAR OTP EXITOSAMENTE
           const formGrid = document.querySelector('.form-grid');
           const termsWrap = document.getElementById('wrapTerms');
           const dropAreaEl = document.getElementById('dropArea');
@@ -1510,7 +1574,6 @@
           btnDescargarLectura.style.display = 'none';
         }
 
-        // Posicionar y proponer firma directamente en la última página original
         datosTrazabilidad.coordenadas = { x_pct: null, y_pct: null };
         await irAPagina(pdfActual.numPages);
         setTimeout(() => {
@@ -1623,7 +1686,6 @@
         let x = clientX - rect.left;
         let y = clientY - rect.top;
 
-        // Auto-crear y saltar a página adicional al rebasar el borde inferior de la última página
         if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages && paginasExtraEnBlanco === 0 && y >= rect.height - 35) {
           isChangingPage = true;
           paginasExtraEnBlanco = 1;
@@ -1648,7 +1710,6 @@
           return;
         }
 
-        // Retornar y remover página adicional al arrastrar al borde superior de la página anexa
         if (pdfActual && datosTrazabilidad.pagina_activa === pdfActual.numPages + 1 && paginasExtraEnBlanco === 1 && y <= 35) {
           isChangingPage = true;
           paginasExtraEnBlanco = 0;
@@ -1672,7 +1733,6 @@
           return;
         }
 
-        // Arrastre libre dentro del lienzo
         if (y >= 0 && y <= rect.height && x >= 0 && x <= rect.width) {
           floatingSignGroup.style.left = `${x}px`;
           floatingSignGroup.style.top = `${y}px`;
@@ -1695,7 +1755,6 @@
       isResizingMarker = false;
     }
 
-    // Eventos Mouse
     markerFirma.addEventListener('mousedown', (e) => {
       if (e.target === resizeHandle) return;
       iniciarArrastre(e.clientX, e.clientY, e.target);
@@ -1713,7 +1772,6 @@
 
     window.addEventListener('mouseup', finalizarArrastre);
 
-    // Eventos Táctiles
     markerFirma.addEventListener('touchstart', (e) => {
       if (e.target === resizeHandle) return;
       const t = e.touches[0];

@@ -483,7 +483,13 @@ def enmascarar_coordenada_gps(coord_val: Any) -> str:
 
 def formatear_gps_reporte_desde_cadena(gps_cadena: str, lang: str = "es") -> str:
     """Procesa una cadena 'Lat: X, Lon: Y' y enmascara cada componente respetando la regla."""
-    txt_no_disp = "Not available / Not provided" if lang == "en" else "No disponible / No proporcionado"
+    if lang == "en":
+        txt_no_disp = "Not available / Not provided"
+    elif lang == "ja":
+        txt_no_disp = "利用不可 / 提供されていません"
+    else:
+        txt_no_disp = "No disponible / No proporcionado"
+        
     if not gps_cadena or "Lat:" not in str(gps_cadena) or "Lon:" not in str(gps_cadena):
         return gps_cadena or txt_no_disp
     try:
@@ -565,7 +571,7 @@ def generar_pdf_firmado_y_guardar(
     pagina_auditoria = doc.new_page(width=595, height=842)
     color_azul_corp = (0.2, 0.4, 0.8)
 
-    # DICCIONARIO MULTILINGÜE PARA EL REPORTE DE AUDITORIA EN PDF
+    # DICCIONARIO MULTILINGÜE PARA EL REPORTE DE AUDITORIA EN PDF (ES, EN, JA)
     t_pdf = {
         "es": {
             "titulo": "Celerdoc: Reporte de Auditoria y Trazabilidad",
@@ -644,6 +650,45 @@ def generar_pdf_firmado_y_guardar(
             "aviso1": "• Transparency: IP and GPS coordinate records are securely stored with exact values for auditing.",
             "aviso2": "• Legal backing: Original audit records remain preserved under Celerdoc digital security standards.",
             "pie": f"Certificate issued by Celerdoc | Final Hash: {sha256_final_certificado[:32]}..."
+        },
+        "ja": {
+            "titulo": "Celerdoc: 監査証跡およびトレーサビリティレポート",
+            "subtitulo": "電子的な完全性、否認防止、およびデジタル認証の証拠",
+            "id_registro": f"レコードID:  {reporte_id_unico}",
+            "total_pags": f"{len(doc)}ページ (監査証跡シートを含む)",
+            "filas": {
+                "doc_orig": "オリジナル文書",
+                "doc_fin": "認定済み最終文書",
+                "firmante": "認定署名者",
+                "id_firmante": "署名者の身分証明",
+                "canales": "通知チャネル",
+                "terms": "利用規約およびプライバシーポリシーの同意",
+                "sha_orig": "オリジナル文書 SHA-256",
+                "sha_fin": "署名済み文書 SHA-256",
+                "hash_trazo": "生体認証ストロークハッシュ",
+                "pkcs_serial": "PKCS#7署名コンテナ",
+                "pkcs_hash": "PKCS#7デジタルハッシュスタンプ",
+                "validador": "トランザクション検証コード",
+                "otp_enviado": "送信および検証済みOTPコード",
+                "otp_val": "OTPの同意と検証",
+                "ip": "署名者のIPアドレス",
+                "gps": "GPS位置情報",
+                "ubicacion": "文書上の署名シールの配置",
+                "tot_pags": "総認定ページ数",
+                "sellado": "最終完全性タイムスタンプ (UTC)"
+            },
+            "cargado": "アップロード日時:",
+            "aceptado_terms": "署名者による明示的な同意",
+            "autenticado_otp": "正常に同意および認証されました",
+            "registrada": "登録日時:",
+            "capturada": "取得日時:",
+            "pagina": "ページ",
+            "qr_header": "完全性の検証および公開確認 (PKCS#7 / SHA-256)",
+            "qr_val": "コード値 / ハッシュ:",
+            "qr_link": "検証リンク:",
+            "aviso1": "• 透明性: IPアドレスおよびGPS座標の記録は、監査のために正確な値で安全に保管されます。",
+            "aviso2": "• 法的裏付け: 当初の監査記録はCelerdocのデジタルセキュリティ基準に基づいて厳重に保管されます。",
+            "pie": f"Celerdoc発行の証明書 | 最終ハッシュ: {sha256_final_certificado[:32]}..."
         }
     }
 
