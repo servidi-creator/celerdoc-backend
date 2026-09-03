@@ -78,6 +78,7 @@ def guardar_registro_auditoria(registro: dict):
         print(f" -> Documento: {registro.get('tipo_documento')} {registro.get('numero_documento')}")
         print(f" -> Email: {registro.get('email_notificacion')}")
         print(f" -> WhatsApp: {registro.get('whatsapp_notificacion')}")
+        print(f" -> Idioma: {registro.get('idioma_reporte', 'es')}")
 
         res = supabase.table("auditoria").upsert(registro, on_conflict="sig").execute()
         print("✓ ¡REGISTRO GUARDADO EN SUPABASE CON ÉXITO!")
@@ -480,10 +481,11 @@ def enmascarar_coordenada_gps(coord_val: Any) -> str:
         return str(coord_val)
 
 
-def formatear_gps_reporte_desde_cadena(gps_cadena: str) -> str:
+def formatear_gps_reporte_desde_cadena(gps_cadena: str, lang: str = "es") -> str:
     """Procesa una cadena 'Lat: X, Lon: Y' y enmascara cada componente respetando la regla."""
+    txt_no_disp = "Not available / Not provided" if lang == "en" else "No disponible / No proporcionado"
     if not gps_cadena or "Lat:" not in str(gps_cadena) or "Lon:" not in str(gps_cadena):
-        return gps_cadena or "No disponible / No proporcionado"
+        return gps_cadena or txt_no_disp
     try:
         sin_prefijos = str(gps_cadena).replace("Lat:", "").strip()
         partes = sin_prefijos.split(",")
@@ -528,9 +530,10 @@ def generar_pdf_firmado_y_guardar(
     numero_documento: str,
     email_notificacion: Optional[str],
     whatsapp_notificacion: Optional[str],
-    codigo_otp_validado: Optional[str]
+    codigo_otp_validado: Optional[str],
+    idioma_reporte: str = "es"
 ):
-    """Procesa de forma síncrona el sellado del PDF y genera la hoja de auditoría antes de responder."""
+    """Procesa de forma síncrona el sellado del PDF y genera la hoja de auditoría en el idioma elegido."""
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
     total_paginas_actuales = len(doc)
@@ -562,39 +565,125 @@ def generar_pdf_firmado_y_guardar(
     pagina_auditoria = doc.new_page(width=595, height=842)
     color_azul_corp = (0.2, 0.4, 0.8)
 
+    # DICCIONARIO MULTILINGÜE PARA EL REPORTE DE AUDITORIA EN PDF
+    t_pdf = {
+        "es": {
+            "titulo": "Celerdoc: Reporte de Auditoria y Trazabilidad",
+            "subtitulo": "Evidencia de integridad electronica, no repudio y certificacion digital",
+            "id_registro": f"ID de Registro:  {reporte_id_unico}",
+            "total_pags": f"{len(doc)} paginas (incluye hoja de auditoria)",
+            "filas": {
+                "doc_orig": "Documento Original",
+                "doc_fin": "Documento Final Certificado",
+                "firmante": "Firmante Certificado",
+                "id_firmante": "Identificacion del Firmante",
+                "canales": "Canales de Notificacion",
+                "terms": "Aceptacion Terminos y Privacidad",
+                "sha_orig": "SHA-256 Documento Original",
+                "sha_fin": "SHA-256 Documento con Firma",
+                "hash_trazo": "Hash Biometrico del Trazo",
+                "pkcs_serial": "Contenedor Firma PKCS#7",
+                "pkcs_hash": "Sello Hash Digital PKCS #7",
+                "validador": "Codigo Validador Transaccion",
+                "otp_enviado": "Codigo OTP Enviado y Verificado",
+                "otp_val": "Aceptacion y Validacion OTP",
+                "ip": "Direccion IP del Firmante",
+                "gps": "Geolocalizacion GPS",
+                "ubicacion": "Ubicacion de Sello en Documento",
+                "tot_pags": "Total Paginas Certificadas",
+                "sellado": "Sellado Final de Integridad UTC"
+            },
+            "cargado": "Cargado:",
+            "aceptado_terms": "Aceptado expresamente por el firmante",
+            "autenticado_otp": "Aceptado y autenticado con exito",
+            "registrada": "Registrada:",
+            "capturada": "Capturada:",
+            "pagina": "Pagina",
+            "qr_header": "VALIDACIÓN Y CONSULTA PÚBLICA DE INTEGRIDAD (PKCS#7 / SHA-256)",
+            "qr_val": "Valor del Código / Hash:",
+            "qr_link": "Enlace de Consulta:",
+            "aviso1": "• Transparencia: Los registros de IP y coordenadas GPS se almacenan de forma exacta para auditoria.",
+            "aviso2": "• Respaldo legal: Los registros originales permanecen custodiados bajo estandares de seguridad en Celerdoc.",
+            "pie": f"Certificado expedido por Celerdoc | Hash Final: {sha256_final_certificado[:32]}..."
+        },
+        "en": {
+            "titulo": "Celerdoc: Audit Trail and Traceability Report",
+            "subtitulo": "Evidence of electronic integrity, non-repudiation, and digital certification",
+            "id_registro": f"Record ID:  {reporte_id_unico}",
+            "total_pags": f"{len(doc)} pages (includes audit trail sheet)",
+            "filas": {
+                "doc_orig": "Original Document",
+                "doc_fin": "Final Certified Document",
+                "firmante": "Certified Signer",
+                "id_firmante": "Signer Identification",
+                "canales": "Notification Channels",
+                "terms": "Terms & Privacy Policy Acceptance",
+                "sha_orig": "Original Document SHA-256",
+                "sha_fin": "Signed Document SHA-256",
+                "hash_trazo": "Biometric Stroke Hash",
+                "pkcs_serial": "PKCS#7 Signature Container",
+                "pkcs_hash": "PKCS#7 Digital Hash Stamp",
+                "validador": "Transaction Validator Code",
+                "otp_enviado": "Sent and Verified OTP Code",
+                "otp_val": "OTP Acceptance & Validation",
+                "ip": "Signer IP Address",
+                "gps": "GPS Geolocation",
+                "ubicacion": "Seal Placement on Document",
+                "tot_pags": "Total Certified Pages",
+                "sellado": "Final Integrity Timestamp UTC"
+            },
+            "cargado": "Uploaded:",
+            "aceptado_terms": "Expressly accepted by the signer",
+            "autenticado_otp": "Successfully accepted and authenticated",
+            "registrada": "Registered:",
+            "capturada": "Captured:",
+            "pagina": "Page",
+            "qr_header": "INTEGRITY VALIDATION AND PUBLIC VERIFICATION (PKCS#7 / SHA-256)",
+            "qr_val": "Code Value / Hash:",
+            "qr_link": "Verification Link:",
+            "aviso1": "• Transparency: IP and GPS coordinate records are securely stored with exact values for auditing.",
+            "aviso2": "• Legal backing: Original audit records remain preserved under Celerdoc digital security standards.",
+            "pie": f"Certificate issued by Celerdoc | Final Hash: {sha256_final_certificado[:32]}..."
+        }
+    }
+
+    lang = idioma_reporte if idioma_reporte in t_pdf else "es"
+    tr = t_pdf[lang]
+    f = tr["filas"]
+
     pagina_auditoria.draw_rect(fitz.Rect(42, 38, 553, 76), color=color_azul_corp, fill=(0.96, 0.98, 1.0), width=0.8)
-    pagina_auditoria.insert_text(fitz.Point(54, 56), "Celerdoc: Reporte de Auditoria y Trazabilidad", fontsize=13, color=color_azul_corp)
-    pagina_auditoria.insert_text(fitz.Point(54, 69), "Evidencia de integridad electronica, no repudio y certificacion digital", fontsize=7.5, color=(0.28, 0.33, 0.41))
+    pagina_auditoria.insert_text(fitz.Point(54, 56), tr["titulo"], fontsize=13, color=color_azul_corp)
+    pagina_auditoria.insert_text(fitz.Point(54, 69), tr["subtitulo"], fontsize=7.5, color=(0.28, 0.33, 0.41))
 
     pagina_auditoria.draw_rect(fitz.Rect(42, 80, 553, 98), color=color_azul_corp, fill=(1, 1, 1), width=0.6)
-    pagina_auditoria.insert_text(fitz.Point(54, 92), f"ID de Registro:  {reporte_id_unico}", fontsize=7.5, color=color_azul_corp)
+    pagina_auditoria.insert_text(fitz.Point(54, 92), tr["id_registro"], fontsize=7.5, color=color_azul_corp)
 
-    total_pags_cert = f"{len(doc)} paginas (incluye hoja de auditoria)"
+    total_pags_cert = tr["total_pags"]
 
     # ENMASCARAMIENTO EXCLUSIVO PARA LA VISUALIZACIÓN DEL REPORTE DE AUDITORIA
     ip_reporte_visible = enmascarar_ip_reporte(ip_real)
-    gps_reporte_visible = formatear_gps_reporte_desde_cadena(gps_real)
+    gps_reporte_visible = formatear_gps_reporte_desde_cadena(gps_real, lang=lang)
 
     filas_auditoria = [
-        ("Documento Original", f"{nombre_original_limpio} (Cargado: {ts_carga[:19]} UTC)"),
-        ("Documento Final Certificado", nombre_final),
-        ("Firmante Certificado", nombre_firmante),
-        ("Identificacion del Firmante", f"{tipo_documento} [{numero_documento}]"),
-        ("Canales de Notificacion", f"Email: {email_notificacion} | Movil: {whatsapp_notificacion}"),
-        ("Aceptacion Terminos y Privacidad", f"Aceptado expresamente por el firmante ({ts_terms[:19]} UTC)"),
-        ("SHA-256 Documento Original", sha256_original),
-        ("SHA-256 Documento con Firma", sha256_final_certificado),
-        ("Hash Biometrico del Trazo", sha256_trazo[:48] + ("..." if len(sha256_trazo) > 48 else "")),
-        ("Contenedor Firma PKCS#7", pkcs7_serial),
-        ("Sello Hash Digital PKCS #7", pkcs7_hash_real),
-        ("Codigo Validador Transaccion", validador_id),
-        ("Codigo OTP Enviado y Verificado", f"OTP-{codigo_otp_validado or '123456'}"),
-        ("Aceptacion y Validacion OTP", f"Aceptado y autenticado con exito ({ts_otp[:19]} UTC)"),
-        ("Direccion IP del Firmante", f"{ip_reporte_visible} (Registrada: {ts_otp[:19]} UTC)"),
-        ("Geolocalizacion GPS", f"{gps_reporte_visible} (Capturada: {ts_trazo[:19]} UTC)"),
-        ("Ubicacion de Sello en Documento", f"Pagina {pagina_seleccionada} [X: {x_pct}%, Y: {y_pct}%]"),
-        ("Total Paginas Certificadas", total_pags_cert),
-        ("Sellado Final de Integridad UTC", timestamp_sellado_utc)
+        (f["doc_orig"], f"{nombre_original_limpio} ({tr['cargado']} {ts_carga[:19]} UTC)"),
+        (f["doc_fin"], nombre_final),
+        (f["firmante"], nombre_firmante),
+        (f["id_firmante"], f"{tipo_documento} [{numero_documento}]"),
+        (f["canales"], f"Email: {email_notificacion} | Tel: {whatsapp_notificacion}"),
+        (f["terms"], f"{tr['aceptado_terms']} ({ts_terms[:19]} UTC)"),
+        (f["sha_orig"], sha256_original),
+        (f["sha_fin"], sha256_final_certificado),
+        (f["hash_trazo"], sha256_trazo[:48] + ("..." if len(sha256_trazo) > 48 else "")),
+        (f["pkcs_serial"], pkcs7_serial),
+        (f["pkcs_hash"], pkcs7_hash_real),
+        (f["validador"], validador_id),
+        (f["otp_enviado"], f"OTP-{codigo_otp_validado or '123456'}"),
+        (f["otp_val"], f"{tr['autenticado_otp']} ({ts_otp[:19]} UTC)"),
+        (f["ip"], f"{ip_reporte_visible} ({tr['registrada']} {ts_otp[:19]} UTC)"),
+        (f["gps"], f"{gps_reporte_visible} ({tr['capturada']} {ts_trazo[:19]} UTC)"),
+        (f["ubicacion"], f"{tr['pagina']} {pagina_seleccionada} [X: {x_pct}%, Y: {y_pct}%]"),
+        (f["tot_pags"], total_pags_cert),
+        (f["sellado"], timestamp_sellado_utc)
     ]
 
     y_offset = 104
@@ -616,18 +705,18 @@ def generar_pdf_firmado_y_guardar(
     pagina_auditoria.insert_image(rect_qr_img, stream=qr_auditoria_bytes)
 
     x_texto_qr = 96
-    pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 18), "VALIDACIÓN Y CONSULTA PÚBLICA DE INTEGRIDAD (PKCS#7 / SHA-256)", fontsize=6.8, fontname="helv", color=color_azul_corp)
-    pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 28), f"Valor del Código / Hash: {pkcs7_hash_real}", fontsize=5.6, fontname="courier", color=(0.1, 0.15, 0.25))
-    pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 38), f"Enlace de Consulta: {pkcs7_qr_url}", fontsize=5.6, fontname="courier", color=(0.2, 0.4, 0.8))
+    pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 18), tr["qr_header"], fontsize=6.8, fontname="helv", color=color_azul_corp)
+    pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 28), f"{tr['qr_val']} {pkcs7_hash_real}", fontsize=5.6, fontname="courier", color=(0.1, 0.15, 0.25))
+    pagina_auditoria.insert_text(fitz.Point(x_texto_qr, y_offset + 38), f"{tr['qr_link']} {pkcs7_qr_url}", fontsize=5.6, fontname="courier", color=(0.2, 0.4, 0.8))
 
     y_offset += alto_bloque_qr + 8
     rect_fila_aviso = fitz.Rect(42, y_offset, 553, y_offset + 32)
     pagina_auditoria.draw_rect(rect_fila_aviso, color=(0.75, 0.83, 0.95), fill=(0.95, 0.97, 1.0), width=0.6)
-    pagina_auditoria.insert_text(fitz.Point(76, y_offset + 12), "• Transparencia: Los registros de IP y coordenadas GPS se almacenan de forma exacta para auditoria.", fontsize=5.8, color=(0.18, 0.23, 0.32))
-    pagina_auditoria.insert_text(fitz.Point(76, y_offset + 23), "• Respaldo legal: Los registros originales permanecen custodiados bajo estandares de seguridad en Celerdoc.", fontsize=5.8, color=(0.18, 0.23, 0.32))
+    pagina_auditoria.insert_text(fitz.Point(76, y_offset + 12), tr["aviso1"], fontsize=5.8, color=(0.18, 0.23, 0.32))
+    pagina_auditoria.insert_text(fitz.Point(76, y_offset + 23), tr["aviso2"], fontsize=5.8, color=(0.18, 0.23, 0.32))
 
     pagina_auditoria.draw_line(fitz.Point(42, 792), fitz.Point(553, 792), color=color_azul_corp, width=0.6)
-    pagina_auditoria.insert_text(fitz.Point(42, 804), f"Certificado expedido por Celerdoc | Hash Final: {sha256_final_certificado[:32]}...", fontsize=6, color=(0.4, 0.45, 0.5))
+    pagina_auditoria.insert_text(fitz.Point(42, 804), tr["pie"], fontsize=6, color=(0.4, 0.45, 0.5))
 
     ruta_salida_pdf = os.path.join(OUTPUT_DIR, nombre_final)
     doc.save(ruta_salida_pdf)
@@ -659,7 +748,8 @@ def generar_pdf_firmado_y_guardar(
         "ts_trazo": ts_trazo,
         "ts_otp": ts_otp,
         "ip_enmascarada": ip_real,
-        "gps_enmascarado": gps_real
+        "gps_enmascarado": gps_real,
+        "idioma_reporte": idioma_reporte
     })
 
 
@@ -688,6 +778,7 @@ class FirmaPayload(BaseModel):
     sha256_original: Optional[str] = None
     codigo_otp_validado: Optional[str] = "123456"
     user_agent: Optional[str] = None
+    idioma_seleccionado: Optional[str] = "es"
 
 
 @app.post("/procesar-firma")
@@ -748,6 +839,8 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             "qr_data": pkcs7_qr_url
         }
 
+        idioma_reporte_final = payload.idioma_seleccionado or "es"
+
         generar_pdf_firmado_y_guardar(
             pdf_bytes,
             payload.total_paginas_con_extras,
@@ -780,7 +873,8 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
             payload.numero_documento,
             payload.email_notificacion,
             payload.whatsapp_notificacion,
-            payload.codigo_otp_validado
+            payload.codigo_otp_validado,
+            idioma_reporte=idioma_reporte_final
         )
 
         return {
@@ -796,7 +890,8 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
                 "sha256_final": sha256_final_certificado,
                 "pkcs7_serial": pkcs7_serial,
                 "codigo_validador": validador_id,
-                "sellado_tiempo_utc": timestamp_sellado_utc
+                "sellado_tiempo_utc": timestamp_sellado_utc,
+                "idioma_reporte": idioma_reporte_final
             }
         }
     except Exception as e:

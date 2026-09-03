@@ -502,19 +502,19 @@
       
       <div class="form-group">
         <label for="nombreTitular" id="lblNombreTitular">Nombre Completo *</label>
-        <input type="text" id="nombreTitular">
+        <input type="text" id="nombreTitular" placeholder="Ej. Juan Pérez">
         <div class="error-msg-field" id="errNombre">Nombre obligatorio (mínimo 3 caracteres)</div>
       </div>
       
       <div class="form-group">
         <label for="numDoc" id="lblNumDoc">Nº de Documento *</label>
-        <input type="text" id="numDoc">
+        <input type="text" id="numDoc" placeholder="Ej. 12345678">
         <div class="error-msg-field" id="errNumDoc">Documento obligatorio (mínimo 4 caracteres)</div>
       </div>
       
       <div class="form-group">
         <label for="emailNotif" id="lblEmail">Correo Electrónico *</label>
-        <input type="email" id="emailNotif">
+        <input type="email" id="emailNotif" placeholder="ejemplo@correo.com">
         <div class="error-msg-field" id="errEmail">Formato de correo inválido</div>
       </div>
       
@@ -522,7 +522,7 @@
         <label for="whatsappNotif" id="lblWhatsapp">Celular / WhatsApp *</label>
         <div class="phone-input-wrap" id="wrapPhone">
           <span class="phone-prefix" id="phonePrefixLabel">+57</span>
-          <input type="text" id="whatsappNotif" maxlength="15">
+          <input type="text" id="whatsappNotif" maxlength="15" placeholder="3001234567">
         </div>
         <div class="error-msg-field" id="errPhone">Solo números (mínimo 7 dígitos)</div>
       </div>
@@ -578,7 +578,7 @@
               <div class="resize-handle" id="resizeHandle" title="Arrastra para redimensionar el recuadro">↘</div>
             </div>
             <button type="button" class="btn-floating-sign" id="btnFloatingSign">
-              <span>✍️ Firmar</span>
+              <span id="lblBtnSignText">✍️ Firmar</span>
             </button>
           </div>
 
@@ -589,7 +589,7 @@
     <!-- MODAL DUAL: TRAZO MANUAL O SUBIR IMAGEN -->
     <div class="modal-overlay" id="modalSignaturePad">
       <div class="modal-card">
-        <h3>Realice o Inserte su Firma</h3>
+        <h3 id="txtModalFirmaTitulo">Realice o Inserte su Firma</h3>
         
         <div class="tab-bar-firma">
           <button type="button" class="tab-btn active" id="tabBtnDibujar">✍️ Dibujar Trazo</button>
@@ -607,8 +607,8 @@
         <!-- Pestaña 2: Imagen de Firma -->
         <div class="tab-content" id="tabContentImagen">
           <div class="image-drop-zone" id="imageDropZone" onclick="document.getElementById('inputImgFirma').click()">
-            <div class="image-upload-btn-ui">📂 Seleccionar Archivo de Imagen</div>
-            <div style="font-size: 12px; color: var(--text-muted);">Formatos compatibles: PNG, JPG, WEBP, SVG (Fondo transparente recomendado)</div>
+            <div class="image-upload-btn-ui" id="txtBtnSelectImg">📂 Seleccionar Archivo de Imagen</div>
+            <div style="font-size: 12px; color: var(--text-muted);" id="txtImgFormats">Formatos compatibles: PNG, JPG, WEBP, SVG (Fondo transparente recomendado)</div>
           </div>
 
           <div class="image-preview-wrapper" id="imagePreviewWrapper">
@@ -618,9 +618,9 @@
           <input type="file" id="inputImgFirma" accept="image/png, image/jpeg, image/webp, image/svg+xml">
           
           <div class="image-controls-bar" id="imgControlsBar" style="display:none;">
-            <span>Ajustar Escala:</span>
+            <span id="txtScaleAdjust">Ajustar Escala:</span>
             <input type="range" id="rangeImgScale" min="40" max="160" value="100">
-            <button type="button" class="btn-control" onclick="document.getElementById('inputImgFirma').click()">Cambiar imagen</button>
+            <button type="button" class="btn-control" id="btnChangeImg" onclick="document.getElementById('inputImgFirma').click()">Cambiar imagen</button>
           </div>
         </div>
 
@@ -728,10 +728,31 @@
         lblEmail: "Correo Electrónico *",
         lblWhatsapp: "Celular / WhatsApp *",
         lblTerms: "Acepto los Términos, Condiciones y Política de Privacidad de Celerdoc.",
+        phNombre: "Ej. Juan Pérez",
+        phNumDoc: "Ej. 12345678",
+        phEmail: "ejemplo@correo.com",
+        phWhatsapp: "3001234567",
+        errNombre: "Nombre obligatorio (mínimo 3 caracteres)",
+        errNumDoc: "Documento obligatorio (mínimo 4 caracteres)",
+        errEmail: "Formato de correo inválido",
+        errPhone: "Solo números (mínimo 7 dígitos)",
         btnAccion: "Insertar documento para firmar",
+        btnReemplazar: "Reemplazar documento",
         dropSubtitle: "Haga clic, arrastre o pegue (Ctrl+V) aquí el archivo PDF",
         lblBtnFirmar: "✍️ Firmar",
+        modalFirmaTitulo: "Realice o Inserte su Firma",
+        tabDibujar: "✍️ Dibujar Trazo",
+        tabImagen: "🖼️ Cargar Imagen",
+        padPlaceholder: "Trace aquí su firma",
+        btnSelectImg: "📂 Seleccionar Archivo de Imagen",
+        txtImgFormats: "Formatos compatibles: PNG, JPG, WEBP, SVG (Fondo transparente recomendado)",
+        txtScaleAdjust: "Ajustar Escala:",
+        btnChangeImg: "Cambiar imagen",
+        btnClearSig: "Borrar / Limpiar",
+        btnCancelSig: "Cancelar",
+        btnConfirmSig: "Firmar y Continuar",
         otpTitulo: "Verificación de Identidad por OTP",
+        btnConfirmarOtp: "Confirmar Código",
         btnCancelarOtp: "Cancelar",
         btnDescargar: "📥 Descargar Nuevo PDF Firmado",
         sugeridosTitulo: "Top 20 Países Sugeridos",
@@ -746,6 +767,10 @@
         ofText: "de",
         downloadReader: "📥 Descargar documento original",
         badgeActive: "Página Activa / Documento Original",
+        successTitle: "¡Firma completada con éxito!",
+        successSubtitle: "Tu documento ha sido firmado con plena validez legal.",
+        btnFirmarNuevo: "🔄 Firmar nuevo documento",
+        btnSalirSesion: "❌ Salir",
         docs: [
           { val: "CC", text: "CC - Cédula de Ciudadanía / DNI" },
           { val: "CE", text: "CE - Cédula de Extranjería" },
@@ -764,10 +789,31 @@
         lblEmail: "Corporate Email *",
         lblWhatsapp: "Mobile / WhatsApp *",
         lblTerms: "I accept Celerdoc Terms, Conditions, and Privacy Policy.",
+        phNombre: "e.g. John Doe",
+        phNumDoc: "e.g. 12345678",
+        phEmail: "example@email.com",
+        phWhatsapp: "5551234567",
+        errNombre: "Name is required (minimum 3 characters)",
+        errNumDoc: "Document ID is required (minimum 4 characters)",
+        errEmail: "Invalid email format",
+        errPhone: "Numbers only (minimum 7 digits)",
         btnAccion: "Insert document to sign",
+        btnReemplazar: "Replace document",
         dropSubtitle: "Click, drag, or paste (Ctrl+V) your PDF file here",
         lblBtnFirmar: "✍️ Sign",
+        modalFirmaTitulo: "Draw or Insert your Signature",
+        tabDibujar: "✍️ Draw Stroke",
+        tabImagen: "🖼️ Upload Image",
+        padPlaceholder: "Draw your signature here",
+        btnSelectImg: "📂 Select Image File",
+        txtImgFormats: "Supported formats: PNG, JPG, WEBP, SVG (Transparent background recommended)",
+        txtScaleAdjust: "Adjust Scale:",
+        btnChangeImg: "Change image",
+        btnClearSig: "Clear / Reset",
+        btnCancelSig: "Cancel",
+        btnConfirmSig: "Sign and Continue",
         otpTitulo: "Identity Verification via OTP",
+        btnConfirmarOtp: "Confirm Code",
         btnCancelarOtp: "Cancel",
         btnDescargar: "📥 Download New Signed PDF",
         sugeridosTitulo: "Top 20 Suggested Countries",
@@ -782,6 +828,10 @@
         ofText: "of",
         downloadReader: "📥 Download original document",
         badgeActive: "Active / Original Document Page",
+        successTitle: "Signature completed successfully!",
+        successSubtitle: "Your document has been signed with full legal validity.",
+        btnFirmarNuevo: "🔄 Sign another document",
+        btnSalirSesion: "❌ Exit",
         docs: [
           { val: "CC", text: "CC - National ID / DNI" },
           { val: "CE", text: "CE - Foreign ID Card" },
@@ -973,12 +1023,48 @@
       document.getElementById('lblWhatsapp').textContent = t.lblWhatsapp;
       document.getElementById('lblTerms').textContent = t.lblTerms;
       
+      // Placeholders / Prompts de llenado
+      inputNombre.placeholder = t.phNombre;
+      inputNumDoc.placeholder = t.phNumDoc;
+      inputEmail.placeholder = t.phEmail;
+      inputPhone.placeholder = t.phWhatsapp;
+
+      // Mensajes de error en formulario
+      errNombre.textContent = t.errNombre;
+      errNumDoc.textContent = t.errNumDoc;
+      errEmail.textContent = t.errEmail;
+      errPhone.textContent = t.errPhone;
+
       if (!datosTrazabilidad.nombre_archivo) {
         document.getElementById('txtBtnAccion').textContent = t.btnAccion;
         document.getElementById('txtDropSubtitle').textContent = t.dropSubtitle;
+      } else {
+        document.getElementById('txtBtnAccion').textContent = t.btnReemplazar;
       }
+
+      document.getElementById('lblBtnSignText').textContent = t.lblBtnFirmar;
+      document.getElementById('txtModalFirmaTitulo').textContent = t.modalFirmaTitulo;
+      document.getElementById('tabBtnDibujar').textContent = t.tabDibujar;
+      document.getElementById('tabBtnImagen').textContent = t.tabImagen;
+      document.getElementById('fullscreenPadPlaceholder').textContent = t.padPlaceholder;
+      document.getElementById('txtBtnSelectImg').textContent = t.btnSelectImg;
+      document.getElementById('txtImgFormats').textContent = t.txtImgFormats;
+      document.getElementById('txtScaleAdjust').textContent = t.txtScaleAdjust;
+      document.getElementById('btnChangeImg').textContent = t.btnChangeImg;
+      document.getElementById('btnClearFullscreenSignature').textContent = t.btnClearSig;
+      document.getElementById('btnCancelSignatureModal').textContent = t.btnCancelSig;
+      document.getElementById('btnConfirmSignatureModal').textContent = t.btnConfirmSig;
+
       document.getElementById('txtOtpTitulo').textContent = t.otpTitulo;
+      document.getElementById('btnConfirmarOtpManual').textContent = t.btnConfirmarOtp;
+      document.getElementById('btnCancelarOtpModal').textContent = t.btnCancelarOtp;
+
+      document.getElementById('txtSuccessTitle').textContent = t.successTitle;
+      document.getElementById('txtSuccessSubtitle').textContent = t.successSubtitle;
       document.getElementById('btnDescargar').textContent = t.btnDescargar;
+      document.getElementById('btnFirmarNuevo').textContent = t.btnFirmarNuevo;
+      document.getElementById('btnSalirSesion').textContent = t.btnSalirSesion;
+
       document.getElementById('titleSugeridos').textContent = t.sugeridosTitulo;
       btnShowAllCountries.textContent = t.verTodos;
 
@@ -1378,7 +1464,7 @@
         timestampCargaDocUtc = new Date().toISOString();
         datosTrazabilidad.timestamp_utc = timestampCargaDocUtc;
         
-        document.getElementById('txtBtnAccion').textContent = "Reemplazar documento";
+        document.getElementById('txtBtnAccion').textContent = textosIdiomas[idiomaActivo].btnReemplazar;
         document.getElementById('txtDropSubtitle').textContent = `Documento cargado: ${datosTrazabilidad.nombre_archivo}`;
 
         blobOriginalUrl = URL.createObjectURL(archivo);
@@ -1714,7 +1800,8 @@
         timestamp_otp: new Date().toISOString(),
         sha256_original: datosTrazabilidad.sha256_original,
         codigo_otp_validado: codigoOtpValido,
-        user_agent: navigator.userAgent
+        user_agent: navigator.userAgent,
+        idioma_seleccionado: idiomaActivo
       };
 
       try {
