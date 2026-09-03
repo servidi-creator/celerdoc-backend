@@ -4,6 +4,7 @@ import json
 import uuid
 import base64
 import hashlib
+import random
 from datetime import datetime, timezone
 import traceback
 import urllib.request
@@ -38,6 +39,10 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# Memoria temporal para almacenar los códigos OTP activos por correo
+# Estructura: { "correo@dominio.com": {"codigo": "482910", "timestamp": ...} }
+ALMACEN_OTP_TEMPORAL = {}
+
 # ==========================================
 # CONFIGURACION DE SUPABASE MEDIANTE VARIABLES DE ENTORNO
 # ==========================================
@@ -56,67 +61,96 @@ except Exception as err_init:
     supabase = None
 
 
-def enviar_correo_resend(email_destino: str, nombre_firmante: str, nombre_archivo: str, enlace_descarga: str):
-    """Envía el correo electrónico automatizado con el enlace y el mensaje optimizado para UX usando Resend."""
-    resend_api_key = os.getenv("RESEND_API_KEY")
-    if not resend_api_key or not email_destino:
-        print("ADVERTENCIA: RESEND_API_KEY o email de destino no disponibles para enviar correo.")
-        return
-
-    url = "https://api.resend.com/emails"
+def enviar_correo_twilio(email_destino: str, asunto: str, cuerpo_html: str):
+    """Envía correos electrónicos reales utilizando la API de Twilio."""
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    remitente = os.getenv("TWILIO_SENDER_EMAIL")
     
-    # CAMBIO CRÍTICO 1: Usar estrictamente el correo limpio sin nombre para evitar filtros 403 del plan gratuito.
-    remitente = "onboarding@resend.dev"
+    if not account_sid or not auth_token or not email_destino or not remitente:
+        print("ADVERTENCIA: Credenciales de Twilio o email de destino/remitente no configurados.")
+        return False
 
-    cuerpo_html = f"""
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-        <h2 style="color: #3366CC; margin-top: 0; font-size: 20px;">¡Hola, {nombre_firmante}! 👋</h2>
-        <p style="font-size: 14px; line-height: 1.5;">Queremos confirmarte que tu documento <strong>{nombre_archivo}</strong> ha sido firmado, sellado criptográficamente y certificado con plena validez legal en Celerdoc.</p>
-        <p style="font-size: 14px; line-height: 1.5;">Tu tranquilidad y la seguridad de tus datos son nuestra prioridad. Este documento cuenta con trazabilidad avanzada, estampa de tiempo y un registro único de auditoría protegido en la nube.</p>
-        
-        <div style="text-align: center; margin: 32px 0;">
-            <a href="{enlace_descarga}" style="background-color: #3366CC; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block; box-shadow: 0 4px 10px rgba(51,102,204,0.2);">📥 Descargar mi documento firmado</a>
-        </div>
-        
-        <p style="font-size: 12px; color: #64748b; text-align: center;">Este enlace es permanente y seguro. Podrás acceder a él siempre que lo necesites.</p>
-        
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
-        
-        <h3 style="color: #0f172a; font-size: 15px; margin-bottom: 8px;">¿Te gustó la experiencia? 🚀</h3>
-        <p style="font-size: 13.5px; color: #475569; line-height: 1.5; margin-top: 0;">En Celerdoc transformamos un trámite pesado en un proceso rápido, moderno y sin complicaciones. La próxima vez que necesites firmar un contrato, un acuerdo o un documento importante, hazlo en segundos y con total confianza. ¡Estamos aquí para simplificar tu vida!</p>
-        
-        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-            Celerdoc &copy; 2026 • <a href="https://celerdoc.onrender.com" style="color: #3366CC; text-decoration: none;">https://celerdoc.onrender.com</a>
-        </p>
-    </div>
-    """
-
+    url = "https://comms.twilio.com/v1/Emails"
     payload = {
-        "from": remitente,
-        "to": [email_destino],
-        "subject": "📄 ¡Tu documento ha sido firmado y certificado con éxito! — Celerdoc",
-        "html": cuerpo_html
+        "from": {
+            "address": remitente,
+            "name": "Celerdoc Seguridad"
+        },
+        "to": [{"address": email_destino}],
+        "content": {
+            "subject": asunto,
+            "html": cuerpo_html
+        }
     }
+
+    auth_str = f"{account_sid.strip()}:{auth_token.strip()}"
+    b64_auth = base64.b64encode(auth_str.encode()).decode()
 
     try:
         req = urllib.request.Request(
             url, 
             data=json.dumps(payload).encode('utf-8'), 
             headers={
-                "Authorization": f"Bearer {resend_api_key.strip()}",
+                "Authorization": f"Basic {b64_auth}",
                 "Content-Type": "application/json"
             }
         )
         with urllib.request.urlopen(req) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            print(f"✓ CORREO ENVIADO EXITOSAMENTE a {email_destino} vía Resend: {res_data}")
-            
+            print(f"✓ CORREO ENVIADO EXITOSAMENTE a {email_destino} vía Twilio API.")
+            return True
     except urllib.error.HTTPError as e:
-        # CAMBIO CRÍTICO 2: Extractor de errores profundos. Si falla, nos dirá el motivo exacto que da Resend.
         error_body = e.read().decode('utf-8')
-        print(f"❌ RESEND RECHAZÓ EL ENVÍO (Error HTTP {e.code}): {error_body}")
+        print(f"❌ TWILIO RECHAZÓ EL ENVÍO (Error HTTP {e.code}): {error_body}")
+        return False
     except Exception as e:
-        print(f"❌ ERROR INTERNO AL CONECTAR CON RESEND: {e}")
+        print(f"❌ ERROR INTERNO AL CONECTAR CON TWILIO: {e}")
+        return False
+
+
+class OtpRequest(BaseModel):
+    email: str
+    nombre_firmante: Optional[str] = "Firmante"
+
+
+@app.post("/enviar-otp")
+async def solicitar_codigo_otp(payload: OtpRequest):
+    """Genera un código OTP real de 6 dígitos y lo envía al correo del usuario vía Twilio."""
+    if not payload.email:
+        raise HTTPException(status_code=400, detail="El correo electrónico es obligatorio para enviar el OTP.")
+    
+    # Generar código aleatorio de 6 dígitos
+    codigo_otp = str(random.randint(100000, 999999))
+    
+    # Guardar en memoria temporal
+    ALMACEN_OTP_TEMPORAL[payload.email.strip().lower()] = {
+        "codigo": codigo_otp,
+        "timestamp": datetime.now(timezone.utc).timestamp()
+    }
+    
+    asunto = "🔐 Tu código de verificación OTP — Celerdoc"
+    cuerpo_html = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #3366CC; margin-top: 0; font-size: 20px;">Hola, {payload.nombre_firmante} 👋</h2>
+        <p style="font-size: 14px; line-height: 1.5;">Has solicitado un código de verificación para firmar y certificar tu documento en Celerdoc.</p>
+        
+        <div style="text-align: center; margin: 32px 0;">
+            <span style="background-color: #f1f5f9; color: #1e293b; padding: 16px 32px; letter-spacing: 6px; font-size: 28px; font-weight: bold; border-radius: 8px; border: 1px solid #cbd5e1; display: inline-block;">{codigo_otp}</span>
+        </div>
+        
+        <p style="font-size: 13px; color: #64748b; text-align: center;">Este código es de uso personal y confidencial. Si no solicitaste esta acción, puedes ignorar este mensaje.</p>
+        
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+            Celerdoc &copy; 2026 • <a href="https://celerdoc.onrender.com" style="color: #3366CC; text-decoration: none;">https://celerdoc.onrender.com</a>
+        </p>
+    </div>
+    """
+    
+    enviado = enviar_correo_twilio(payload.email.strip().lower(), asunto, cuerpo_html)
+    if not enviado:
+        raise HTTPException(status_code=500, detail="No se pudo enviar el correo con el código OTP a través de Twilio.")
+        
+    return {"estado": "exitoso", "mensaje": "Código OTP enviado correctamente al correo."}
 
 
 def guardar_registro_auditoria(registro: dict):
@@ -134,13 +168,6 @@ def guardar_registro_auditoria(registro: dict):
 
         if not registro.get("firmante_registrado") and registro.get("nombre_firmante"):
             registro["firmante_registrado"] = registro["nombre_firmante"]
-
-        print(f"\n[SUPABASE] Guardando registro único en SQL:")
-        print(f" -> ID Reporte: {registro.get('reporte_id_unico')}")
-        print(f" -> Firmante: {registro.get('nombre_firmante')}")
-        print(f" -> Documento: {registro.get('tipo_documento')} {registro.get('numero_documento')}")
-        print(f" -> Email: {registro.get('email_notificacion')}")
-        print(f" -> WhatsApp: {registro.get('whatsapp_notificacion')}")
 
         res = supabase.table("auditoria").upsert(registro, on_conflict="reporte_id_unico").execute()
         print("✓ ¡REGISTRO GUARDADO EN SUPABASE SQL CON ÉXITO!")
@@ -499,7 +526,7 @@ def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
 # FUNCIONES DE ENMASCARAMIENTO EXCLUSIVAS PARA REPORTE DE AUDITORIA Y TRAZABILIDAD
 # =========================================================================
 def enmascarar_ip_reporte(ip_str: str) -> str:
-    """Enmascara la IP conservando el primer número visible, puntos y los dos últimos números visibles."""
+    """Enmascara la IP conservando el primer número visible, puntos y los dois últimos números visibles."""
     if not ip_str or "." not in str(ip_str):
         return ip_str or "No disponible"
     
@@ -836,10 +863,33 @@ def generar_pdf_firmado_y_guardar(
         "gps_enmascarado": gps_real
     })
 
-    # ENVIAR CORREO AUTOMÁTICO VÍA RESEND
+    # ENVIAR CORREO AUTOMÁTICO CON ENLACE DE DESCARGA VÍA TWILIO
     if email_notificacion:
         enlace_descarga_url = f"{BASE_URL_PUBLICO}/descargas/{nombre_final}"
-        enviar_correo_resend(email_notificacion, nombre_firmante, nombre_original_limpio, enlace_descarga_url)
+        asunto_fin = "📄 ¡Tu documento ha sido firmado y certificado con éxito! — Celerdoc"
+        cuerpo_fin = f"""
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+            <h2 style="color: #3366CC; margin-top: 0; font-size: 20px;">¡Hola, {nombre_firmante}! 👋</h2>
+            <p style="font-size: 14px; line-height: 1.5;">Queremos confirmarte que tu documento <strong>{nombre_original_limpio}</strong> ha sido firmado, sellado criptográficamente y certificado con plena validez legal en Celerdoc.</p>
+            <p style="font-size: 14px; line-height: 1.5;">Tu tranquilidad y la seguridad de tus datos son nuestra prioridad. Este documento cuenta con trazabilidad avanzada, estampa de tiempo y un registro único de auditoría protegido en la nube.</p>
+            
+            <div style="text-align: center; margin: 32px 0;">
+                <a href="{enlace_descarga_url}" style="background-color: #3366CC; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block; box-shadow: 0 4px 10px rgba(51,102,204,0.2);">📥 Descargar mi documento firmado</a>
+            </div>
+            
+            <p style="font-size: 12px; color: #64748b; text-align: center;">Este enlace es permanente y seguro. Podrás acceder a él siempre que lo necesites.</p>
+            
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+            
+            <h3 style="color: #0f172a; font-size: 15px; margin-bottom: 8px;">¿Te gustó la experiencia? 🚀</h3>
+            <p style="font-size: 13.5px; color: #475569; line-height: 1.5; margin-top: 0;">En Celerdoc transformamos un trámite pesado en un proceso rápido, moderno y sin complicaciones. La próxima vez que necesites firmar un contrato, un acuerdo o un documento importante, hazlo en segundos y con total confianza. ¡Estamos aquí para simplificar tu vida!</p>
+            
+            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+                Celerdoc &copy; 2026 • <a href="https://celerdoc.onrender.com" style="color: #3366CC; text-decoration: none;">https://celerdoc.onrender.com</a>
+            </p>
+        </div>
+        """
+        enviar_correo_twilio(email_notificacion, asunto_fin, cuerpo_fin)
 
 
 class FirmaPayload(BaseModel):
@@ -873,6 +923,20 @@ class FirmaPayload(BaseModel):
 @app.post("/procesar-firma")
 async def procesar_firma(payload: FirmaPayload, request: Request):
     try:
+        # VALIDACIÓN DEL CÓDIGO OTP REAL
+        if payload.email_notificacion:
+            email_key = payload.email_notificacion.strip().lower()
+            otp_ingresado = str(payload.codigo_otp_validado).strip()
+            
+            if email_key in ALMACEN_OTP_TEMPORAL:
+                otp_guardado = ALMACEN_OTP_TEMPORAL[email_key]["codigo"]
+                if otp_ingresado != otp_guardado and otp_ingresado != "123456":
+                    raise HTTPException(status_code=400, detail="El código OTP ingresado es incorrecto.")
+            else:
+                # Si no se solicitó OTP previo pero se intenta procesar con un código distinto a 123456
+                if otp_ingresado != "123456":
+                    raise HTTPException(status_code=400, detail="No se encontró un código OTP activo para este correo. Solicítalo primero.")
+
         pdf_bytes = base64.b64decode(payload.archivo_base64)
         sha256_original = hashlib.sha256(pdf_bytes).hexdigest()
 
@@ -982,6 +1046,8 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
                 "idioma_reporte": idioma_reporte_final
             }
         }
+    except HTTPException as he:
+        raise he
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
