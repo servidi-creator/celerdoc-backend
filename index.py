@@ -6,6 +6,7 @@ import base64
 import hashlib
 from datetime import datetime, timezone
 import traceback
+import urllib.request
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -52,6 +53,62 @@ try:
 except Exception as err_init:
     print(f"Error al inicializar cliente Supabase: {err_init}")
     supabase = None
+
+
+def enviar_correo_resend(email_destino: str, nombre_firmante: str, nombre_archivo: str, enlace_descarga: str):
+    """Envía el correo electrónico automatizado con el enlace y el mensaje optimizado para UX usando Resend."""
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    if not resend_api_key or not email_destino:
+        print("ADVERTENCIA: RESEND_API_KEY o email de destino no disponibles para enviar correo.")
+        return
+
+    url = "https://api.resend.com/emails"
+    remitente = "Celerdoc <onboarding@resend.dev>"
+
+    cuerpo_html = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #3366CC; margin-top: 0; font-size: 20px;">¡Hola, {nombre_firmante}! 👋</h2>
+        <p style="font-size: 14px; line-height: 1.5;">Queremos confirmarte que tu documento <strong>{nombre_archivo}</strong> ha sido firmado, sellado criptográficamente y certificado con plena validez legal en Celerdoc.</p>
+        <p style="font-size: 14px; line-height: 1.5;">Tu tranquilidad y la seguridad de tus datos son nuestra prioridad. Este documento cuenta con trazabilidad avanzada, estampa de tiempo y un registro único de auditoría protegido en la nube.</p>
+        
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="{enlace_descarga}" style="background-color: #3366CC; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block; box-shadow: 0 4px 10px rgba(51,102,204,0.2);">📥 Descargar mi documento firmado</a>
+        </div>
+        
+        <p style="font-size: 12px; color: #64748b; text-align: center;">Este enlace es permanente y seguro. Podrás acceder a él siempre que lo necesites.</p>
+        
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+        
+        <h3 style="color: #0f172a; font-size: 15px; margin-bottom: 8px;">¿Te gustó la experiencia? 🚀</h3>
+        <p style="font-size: 13.5px; color: #475569; line-height: 1.5; margin-top: 0;">En Celerdoc transformamos un trámite pesado en un proceso rápido, moderno y sin complicaciones. La próxima vez que necesites firmar un contrato, un acuerdo o un documento importante, hazlo en segundos y con total confianza. ¡Estamos aquí para simplificar tu vida!</p>
+        
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+            Celerdoc &copy; 2026 • <a href="https://celerdoc.onrender.com" style="color: #3366CC; text-decoration: none;">https://celerdoc.onrender.com</a>
+        </p>
+    </div>
+    """
+
+    payload = {
+        "from": remitente,
+        "to": [email_destino],
+        "subject": "📄 ¡Tu documento ha sido firmado y certificado con éxito! — Celerdoc",
+        "html": cuerpo_html
+    }
+
+    try:
+        req = urllib.request.Request(
+            url, 
+            data=json.dumps(payload).encode('utf-8'), 
+            headers={
+                "Authorization": f"Bearer {resend_api_key}",
+                "Content-Type": "application/json"
+            }
+        )
+        with urllib.request.urlopen(req) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            print(f"✓ Correo enviado exitosamente a {email_destino} vía Resend: {res_data}")
+    except Exception as e:
+        print(f"❌ Error al enviar correo con Resend: {e}")
 
 
 def guardar_registro_auditoria(registro: dict):
@@ -480,7 +537,7 @@ def enmascarar_coordenada_gps(coord_val: Any) -> str:
         abs_val = abs(val)
         partes = f"{abs_val:.4f}".split(".")
         enteros_str = partes[0]
-        decimales_str = partes[1]  # 4 decimales
+        decimales_str = partes[1]
         enteros_mask = "*" * len(enteros_str)
         decimales_mask = f"**{decimales_str[-2:]}"
         return f"{signo}{enteros_mask}.{decimales_mask}"
@@ -576,7 +633,6 @@ def generar_pdf_firmado_y_guardar(
     pagina_auditoria = doc.new_page(width=595, height=842)
     color_azul_corp = (0.2, 0.4, 0.8)
 
-    # DICCIONARIO MULTILINGÜE PARA EL REPORTE DE AUDITORIA EN PDF (ES, EN)
     t_pdf = {
         "es": {
             "titulo": "Celerdoc: Reporte de Auditoria y Trazabilidad",
@@ -731,7 +787,7 @@ def generar_pdf_firmado_y_guardar(
     pdf_output_bytes = doc.tobytes()
     doc.close()
 
-    # Subir a Supabase Storage (Bucket: documentos-firmados)
+    # Subir a Supabase Storage
     if supabase:
         try:
             supabase.storage.from_("documentos-firmados").upload(
@@ -743,7 +799,7 @@ def generar_pdf_firmado_y_guardar(
         except Exception as err_storage:
             print(f"❌ Error al subir a Supabase Storage: {err_storage}")
 
-    # Guardar metadatos de auditoría en Supabase SQL (sin el campo conflictivo de idioma)
+    # Guardar metadatos de auditoría en Supabase SQL
     guardar_registro_auditoria({
         "hash_pkcs7_corto": hash_corto,
         "sig": reporte_id_unico,
@@ -771,6 +827,11 @@ def generar_pdf_firmado_y_guardar(
         "ip_enmascarada": ip_real,
         "gps_enmascarado": gps_real
     })
+
+    # ENVIAR CORREO AUTOMÁTICO VÍA RESEND
+    if email_notificacion:
+        enlace_descarga_url = f"{BASE_URL_PUBLICO}/descargas/{nombre_final}"
+        enviar_correo_resend(email_notificacion, nombre_firmante, nombre_original_limpio, enlace_descarga_url)
 
 
 class FirmaPayload(BaseModel):
@@ -898,7 +959,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
 
         return {
             "estado": "exitoso",
-            "mensaje": "Documento firmado, auditado y certificado con éxito en Supabase SQL y Storage.",
+            "mensaje": "Documento firmado, auditado, certificado y correo enviado con éxito.",
             "datos_archivo": {
                 "nombre_final": nombre_final,
                 "ruta_descarga": f"/descargas/{nombre_final}"
