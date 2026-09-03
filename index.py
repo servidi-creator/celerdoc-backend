@@ -7,6 +7,7 @@ import hashlib
 from datetime import datetime, timezone
 import traceback
 import urllib.request
+import urllib.error
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -63,7 +64,9 @@ def enviar_correo_resend(email_destino: str, nombre_firmante: str, nombre_archiv
         return
 
     url = "https://api.resend.com/emails"
-    remitente = "Celerdoc <onboarding@resend.dev>"
+    
+    # CAMBIO CRÍTICO 1: Usar estrictamente el correo limpio sin nombre para evitar filtros 403 del plan gratuito.
+    remitente = "onboarding@resend.dev"
 
     cuerpo_html = f"""
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
@@ -100,15 +103,20 @@ def enviar_correo_resend(email_destino: str, nombre_firmante: str, nombre_archiv
             url, 
             data=json.dumps(payload).encode('utf-8'), 
             headers={
-                "Authorization": f"Bearer {resend_api_key}",
+                "Authorization": f"Bearer {resend_api_key.strip()}",
                 "Content-Type": "application/json"
             }
         )
         with urllib.request.urlopen(req) as response:
             res_data = json.loads(response.read().decode('utf-8'))
-            print(f"✓ Correo enviado exitosamente a {email_destino} vía Resend: {res_data}")
+            print(f"✓ CORREO ENVIADO EXITOSAMENTE a {email_destino} vía Resend: {res_data}")
+            
+    except urllib.error.HTTPError as e:
+        # CAMBIO CRÍTICO 2: Extractor de errores profundos. Si falla, nos dirá el motivo exacto que da Resend.
+        error_body = e.read().decode('utf-8')
+        print(f"❌ RESEND RECHAZÓ EL ENVÍO (Error HTTP {e.code}): {error_body}")
     except Exception as e:
-        print(f"❌ Error al enviar correo con Resend: {e}")
+        print(f"❌ ERROR INTERNO AL CONECTAR CON RESEND: {e}")
 
 
 def guardar_registro_auditoria(registro: dict):
