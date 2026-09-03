@@ -1,0 +1,27 @@
+﻿{
+  "titulo": "Celerdoc — 文書署名プラットフォーム",
+  "desc": "オリジナルのPDF文書をアップロードし、署名位置を指定し、OTP認証を行って、法的効力を持つ暗号化された認定文書を生成します。",
+  "lblTipoDoc": "身分証明書の種類",
+  "lblNumDoc": "身分証明書番号 / ID",
+  "lblEmail": "企業メールアドレス",
+  "lblIndicativo": "国 / 電話番号コード",
+  "lblWhatsapp": "携帯電話番号 / WhatsApp",
+  "dropText": "PDFファイルをここにドラッグ＆ドロップ、または貼り付け (Ctrl+V) してください",
+  "lblMetaOriginal": "オリジナル文書:",
+  "lblMetaTimestamp": "アップロード日時 (UTC):",
+  "lblMetaPaginas": "総ページ数:",
+  "lblPagFirma": "署名を配置するページ:",
+  "btnFirmar": "OTPコード検証と署名実行",
+  "otpTitulo": "OTPによる本人確認",
+  "btnConfirmarOtp": "確認して認定文書を生成",
+  "btnCancelarOtp": "キャンセル",
+  "btnDescargar": "署名・監査済み文書をダウンロード",
+  "docTipos": {
+    "NAT": "国民身分証明書 / DNI / ID",
+    "EXT": "外国籍住民登録証明書",
+    "TAX": "納税者番号 / 税務ID (NIT / RUT / RFC / EIN)",
+    "PAS": "パスポート",
+    "PER": "特別滞在許可 / 就労ビザ",
+    "OTH": "その他 (学生証など)"
+  }
+}

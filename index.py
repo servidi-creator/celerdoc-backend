@@ -9,7 +9,7 @@ import traceback
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import pymupdf as fitz
@@ -29,11 +29,9 @@ app.add_middleware(
 BASE_URL_PUBLICO = "https://celerdoc.onrender.com"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.path.join(BASE_DIR, "documentos_firmados")
 CONFIG_JSON_PATH = os.path.join(BASE_DIR, "estilos_firmas.json")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -117,15 +115,24 @@ async def servir_firmar_html():
 
 @app.get("/descargas/{nombre_archivo}")
 async def descargar_documento_firmado(nombre_archivo: str):
-    """Entrega el documento firmado generado con las cabeceras adecuadas de descarga."""
-    ruta_pdf = os.path.join(OUTPUT_DIR, nombre_archivo)
-    if os.path.exists(ruta_pdf):
-        return FileResponse(
-            path=ruta_pdf,
+    """Descarga el documento firmado directamente desde Supabase Storage (Cloud)."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Servicio de almacenamiento no disponible.")
+    
+    try:
+        # Descarga el archivo desde el bucket privado 'documentos-firmados'
+        response = supabase.storage.from_("documentos-firmados").download(nombre_archivo)
+        if not response:
+            raise HTTPException(status_code=404, detail="El archivo solicitado no existe en el almacenamiento.")
+        
+        return StreamingResponse(
+            io.BytesIO(response),
             media_type="application/pdf",
-            filename=nombre_archivo
+            headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"}
         )
-    raise HTTPException(status_code=404, detail="El archivo solicitado no existe o aún se está procesando.")
+    except Exception as e:
+        print(f"Error al descargar desde Supabase Storage: {e}")
+        raise HTTPException(status_code=404, detail="El archivo solicitado no existe o no se pudo recuperar.")
 
 
 @app.get("/validar", response_class=HTMLResponse)
@@ -539,7 +546,7 @@ def generar_pdf_firmado_y_guardar(
     codigo_otp_validado: Optional[str],
     idioma_reporte: str = "es"
 ):
-    """Procesa de forma síncrona el sellado del PDF y genera la hoja de auditoría en el idioma elegido."""
+    """Procesa de forma síncrona el sellado del PDF, genera la hoja de auditoría y lo sube a Supabase Storage."""
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
     total_paginas_actuales = len(doc)
@@ -705,7 +712,6 @@ def generar_pdf_firmado_y_guardar(
 
     total_pags_cert = tr["total_pags"]
 
-    # ENMASCARAMIENTO EXCLUSIVO PARA LA VISUALIZACIÓN DEL REPORTE DE AUDITORIA
     ip_reporte_visible = enmascarar_ip_reporte(ip_real)
     gps_reporte_visible = formatear_gps_reporte_desde_cadena(gps_real, lang=lang)
 
@@ -763,11 +769,23 @@ def generar_pdf_firmado_y_guardar(
     pagina_auditoria.draw_line(fitz.Point(42, 792), fitz.Point(553, 792), color=color_azul_corp, width=0.6)
     pagina_auditoria.insert_text(fitz.Point(42, 804), tr["pie"], fontsize=6, color=(0.4, 0.45, 0.5))
 
-    ruta_salida_pdf = os.path.join(OUTPUT_DIR, nombre_final)
-    doc.save(ruta_salida_pdf)
+    # Guardar PDF temporalmente en memoria para subirlo a Supabase Storage
+    pdf_output_bytes = doc.tobytes()
     doc.close()
 
-    # Guardar en Supabase usando datos 100% íntegros y reales (sin máscaras de reporte)
+    # Subir a Supabase Storage (Bucket: documentos-firmados)
+    if supabase:
+        try:
+            supabase.storage.from_("documentos-firmados").upload(
+                path=nombre_final,
+                file=pdf_output_bytes,
+                file_options={"content-type": "application/pdf", "upsert": "true"}
+            )
+            print(f"✓ Archivo {nombre_final} subido exitosamente a Supabase Storage.")
+        except Exception as err_storage:
+            print(f"❌ Error al subir a Supabase Storage: {err_storage}")
+
+    # Guardar metadatos de auditoría en Supabase SQL
     guardar_registro_auditoria({
         "hash_pkcs7_corto": hash_corto,
         "sig": reporte_id_unico,
@@ -868,7 +886,6 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
 
         pkcs7_qr_url = f"{BASE_URL_PUBLICO}/validar?sig={reporte_id_unico}"
 
-        # Obtención de datos reales y directos (Sin máscaras para base de datos)
         client_ip = request.client.host if request.client else "186.84.92.145"
         ip_real = client_ip
         
@@ -924,7 +941,7 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
 
         return {
             "estado": "exitoso",
-            "mensaje": "Documento firmado, auditado y certificado con éxito.",
+            "mensaje": "Documento firmado, auditado y certificado con éxito en Supabase Storage.",
             "datos_archivo": {
                 "nombre_final": nombre_final,
                 "ruta_descarga": f"/descargas/{nombre_final}"
