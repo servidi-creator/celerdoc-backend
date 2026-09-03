@@ -40,7 +40,6 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Memoria temporal para almacenar los códigos OTP activos por correo
-# Estructura: { "correo@dominio.com": {"codigo": "482910", "timestamp": ...} }
 ALMACEN_OTP_TEMPORAL = {}
 
 # ==========================================
@@ -123,10 +122,8 @@ async def solicitar_codigo_otp(payload: OtpRequest):
     if not payload.email:
         raise HTTPException(status_code=400, detail="El correo electrónico es obligatorio para enviar el OTP.")
     
-    # Generar código aleatorio de 6 dígitos
     codigo_otp = str(random.randint(100000, 999999))
     
-    # Guardar en memoria temporal
     ALMACEN_OTP_TEMPORAL[payload.email.strip().lower()] = {
         "codigo": codigo_otp,
         "timestamp": datetime.now(timezone.utc).timestamp()
@@ -826,7 +823,6 @@ def generar_pdf_firmado_y_guardar(
     pdf_output_bytes = doc.tobytes()
     doc.close()
 
-    # Subir a Supabase Storage
     if supabase:
         try:
             supabase.storage.from_("documentos-firmados").upload(
@@ -838,7 +834,6 @@ def generar_pdf_firmado_y_guardar(
         except Exception as err_storage:
             print(f"❌ Error al subir a Supabase Storage: {err_storage}")
 
-    # Guardar metadatos de auditoría en Supabase SQL
     guardar_registro_auditoria({
         "hash_pkcs7_corto": hash_corto,
         "sig": reporte_id_unico,
@@ -867,7 +862,6 @@ def generar_pdf_firmado_y_guardar(
         "gps_enmascarado": gps_real
     })
 
-    # ENVIAR CORREO AUTOMÁTICO CON ENLACE DE DESCARGA VÍA TWILIO
     if email_notificacion:
         enlace_descarga_url = f"{BASE_URL_PUBLICO}/descargas/{nombre_final}"
         asunto_fin = "📄 ¡Tu documento ha sido firmado y certificado con éxito! — Celerdoc"
@@ -927,17 +921,15 @@ class FirmaPayload(BaseModel):
 @app.post("/procesar-firma")
 async def procesar_firma(payload: FirmaPayload, request: Request):
     try:
-        # VALIDACIÓN DEL CÓDIGO OTP REAL
         if payload.email_notificacion:
             email_key = payload.email_notificacion.strip().lower()
             otp_ingresado = str(payload.codigo_otp_validado).strip()
             
             if email_key in ALMACEN_OTP_TEMPORAL:
-                otp_guardado = ALMACEN_OTP_TEMPORල්[email_key]["codigo"]
+                otp_guardado = ALMACEN_OTP_TEMPORAL[email_key]["codigo"]
                 if otp_ingresado != otp_guardado and otp_ingresado != "123456":
                     raise HTTPException(status_code=400, detail="El código OTP ingresado es incorrecto.")
             else:
-                # Si no se solicitó OTP previo pero se intenta procesar con un código distinto a 123456
                 if otp_ingresado != "123456":
                     raise HTTPException(status_code=400, detail="No se encontró un código OTP activo para este correo. Solicítalo primero.")
 
@@ -983,8 +975,6 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
         client_ip = request.client.host if request.client else "186.84.92.145"
         ip_real = client_ip
         
-        id_firmante_gps = ... # handled above
-
         if payload.latitud_raw is not None and payload.longitud_raw is not None:
             gps_real = f"Lat: {payload.latitud_raw}, Lon: {payload.longitud_raw}"
         else:
