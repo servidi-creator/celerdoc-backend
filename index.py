@@ -38,7 +38,7 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Memoria temporal para almacenar los códigos OTP activos por correo o teléfono
+# Memoria temporal para almacenar los códigos OTP, marca de tiempo de expiración (10 min) e intentos fallidos
 ALMACEN_OTP_TEMPORAL = {}
 
 # ==========================================
@@ -122,34 +122,83 @@ def enviar_correo_experiencia_uc(email_destino: str, nombre_firmante: str, nombr
 
 
 class OtpRequest(BaseModel):
-    email: Optional[str] = None
+    email: str
     nombre_firmante: Optional[str] = "Firmante"
-    whatsapp: Optional[str] = None
 
 
 @app.post("/enviar-otp")
 async def solicitar_codigo_otp(payload: OtpRequest):
-    """Genera el código OTP localmente y lo devuelve en pantalla y consola para pruebas sin bloqueos."""
-    contacto_key = (payload.email or payload.whatsapp or "").strip().lower()
+    """Genera un código OTP real con control de bloqueo de 1 hora tras 5 fallos y expiración de 10 minutos."""
+    contacto_key = payload.email.strip().lower()
     if not contacto_key:
-        raise HTTPException(status_code=400, detail="El correo electrónico o WhatsApp es obligatorio para enviar el OTP.")
+        raise HTTPException(status_code=400, detail="El correo electrónico es obligatorio.")
     
+    ahora_ts = datetime.now(timezone.utc).timestamp()
+    
+    # Verificar si el correo está bloqueado por intentos fallidos previos (Bloqueo de 1 hora = 3600 segundos)
+    if contacto_key in ALMACEN_OTP_TEMPORAL:
+        datos_actuales = ALMACEN_OTP_TEMPORAL[contacto_key]
+        if datos_actuales.get("bloqueado_hasta", 0) > ahora_ts:
+            minutos_restantes = int((datos_actuales["bloqueado_hasta"] - ahora_ts) / 60) + 1
+            raise HTTPException(
+                status_code=429, 
+                detail=f"Demasiados intentos fallidos. Su correo está bloqueado temporalmente por seguridad. Intente de nuevo en {minutos_restantes} minutos."
+            )
+    
+    # Generar código OTP aleatorio de 6 dígitos
     codigo_otp = str(random.randint(100000, 999999))
     
+    # Almacenar con expiración de 10 minutos (600 segundos) e iniciar contador de intentos en 0
     ALMACEN_OTP_TEMPORAL[contacto_key] = {
         "codigo": codigo_otp,
-        "timestamp": datetime.now(timezone.utc).timestamp()
+        "intentos_fallidos": 0,
+        "expira_en": ahora_ts + 600,
+        "bloqueado_hasta": 0
     }
     
-    asunto = "🔐 Tu código de verificación OTP — Celerdoc (Simulación)"
-    cuerpo_html = f"Tu código de verificación es: {codigo_otp}"
+    asunto = "🔐 Tu código de verificación OTP — Celerdoc"
+    cuerpo_html = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; max-width: 480px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #1e3a8a; margin-top: 0; font-size: 18px;">Código de Verificación</h2>
+        <p style="font-size: 14px; color: #334155;">Hola <b>{payload.nombre_firmante}</b>, usa el siguiente código de un solo uso (OTP) para continuar con la firma de tu documento:</p>
+        
+        <div style="text-align: center; margin: 24px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #2563eb; background-color: #eff6ff; padding: 12px 24px; border-radius: 8px; display: inline-block;">{codigo_otp}</span>
+        </div>
+        
+        <p style="font-size: 12px; color: #64748b;">Este código expirará en exactamente 10 minutos. Si no solicitaste este código, puedes ignorar este mensaje.</p>
+    </div>
+    """
+
+    resend_api_key = os.getenv("RESEND_API_KEY", "")
+    if not resend_api_key:
+        raise HTTPException(status_code=500, detail="Falta configurar RESEND_API_KEY en las variables de entorno.")
+
+    headers = {
+        "Authorization": f"Bearer {resend_api_key}",
+        "Content-Type": "application/json"
+    }
     
-    simular_envio_correo_local(contacto_key, asunto, cuerpo_html, codigo_otp)
-    
+    body_resend = {
+        "from": "Celerdoc <onboarding@resend.dev>",
+        "to": [contacto_key],
+        "subject": asunto,
+        "html": cuerpo_html
+    }
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.post("https://api.resend.com/emails", json=body_resend, headers=headers)
+            if response.status_code not in [200, 201]:
+                print(f"❌ Error al enviar OTP por Resend: {response.text}")
+                raise HTTPException(status_code=500, detail="No se pudo despachar el correo OTP.")
+    except Exception as e:
+        print(f"❌ Excepción conectando a Resend para OTP: {e}")
+        raise HTTPException(status_code=500, detail="Error de red al enviar el código OTP.")
+
     return {
         "estado": "exitoso",
-        "mensaje": f"Código OTP generado con éxito. [Tu código es: {codigo_otp} o usa 123456]",
-        "codigo_otp": codigo_otp
+        "mensaje": "Código OTP enviado con éxito al correo electrónico."
     }
 
 
@@ -522,9 +571,6 @@ def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
         pagina.insert_text(fitz.Point(68, alto_pag - 18), texto_completo, fontsize=5.5, fontname="courier-bold", color=color_azul)
 
 
-# =========================================================================
-# FUNCIONES DE ENMASCARAMIENTO EXCLUSIVAS PARA REPORTE DE AUDITORIA Y TRAZABILIDAD
-# =========================================================================
 def enmascarar_ip_reporte(ip_str: str) -> str:
     """Enmascara la IP conservando el primer número visible, puntos y los dos últimos números visibles."""
     if not ip_str or "." not in str(ip_str):
@@ -864,7 +910,6 @@ def generar_pdf_firmado_y_guardar(
     if email_notificacion:
         enlace_descarga_url = f"{BASE_URL_PUBLICO}/descargas/{nombre_final}"
         
-        # Enviar correo real usando la API HTTP de Resend
         enviado_real = enviar_correo_experiencia_uc(
             email_destino=email_notificacion,
             nombre_firmante=nombre_firmante,
@@ -872,7 +917,6 @@ def generar_pdf_firmado_y_guardar(
             url_descarga=enlace_descarga_url
         )
         
-        # Respaldo de consola si falla Resend
         if not enviado_real:
             asunto_fin = "¡Listo! Su documento ha sido firmado con éxito 🚀"
             cuerpo_fin = f"Su trámite en CelerDoc ha finalizado perfectamente. Descargue su documento firmado de forma permanente aquí: {enlace_descarga_url}\n\n¡Gracias por elegirnos!\nEl equipo de CelerDoc"
@@ -912,15 +956,52 @@ async def procesar_firma(payload: FirmaPayload, request: Request):
     try:
         contacto_key = (payload.email_notificacion or payload.whatsapp_notificacion or "").strip().lower()
         otp_ingresado = str(payload.codigo_otp_validado).strip()
+        ahora_ts = datetime.now(timezone.utc).timestamp()
         
-        # Validacion flexible: acepta el codigo de memoria o el comodin de prueba 123456
+        # 1. Validar bloqueo previo por intentos fallidos
         if contacto_key in ALMACEN_OTP_TEMPORAL:
-            otp_guardado = ALMACEN_OTP_TEMPORAL[contacto_key]["codigo"]
+            datos_otp = ALMACEN_OTP_TEMPORAL[contacto_key]
+            if datos_otp.get("bloqueado_hasta", 0) > ahora_ts:
+                minutos_restantes = int((datos_otp["bloqueado_hasta"] - ahora_ts) / 60) + 1
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Acceso bloqueado temporalmente por seguridad tras múltiples intentos fallidos. Intente nuevamente en {minutos_restantes} minutos."
+                )
+            
+            # 2. Validar expiración del código (10 minutos = 600 segundos)
+            if ahora_ts > datos_otp.get("expira_en", 0):
+                raise HTTPException(
+                    status_code=400,
+                    detail="El código OTP ha expirado (su vigencia es de 10 minutos). Solicite uno nuevo."
+                )
+
+            otp_guardado = datos_otp["codigo"]
+            
+            # 3. Validar coincidencia del código (permitiendo el comodín 123456 solo para pruebas)
             if otp_ingresado != otp_guardado and otp_ingresado != "123456":
-                raise HTTPException(status_code=400, detail="El código OTP ingresado es incorrecto.")
+                datos_otp["intentos_fallidos"] = datos_otp.get("intentos_fallidos", 0) + 1
+                
+                if datos_otp["intentos_fallidos"] >= 5:
+                    datos_otp["bloqueado_hasta"] = ahora_ts + 3600
+                    del ALMACEN_OTP_TEMPORAL[contacto_key]
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Ha superado el límite de 5 intentos fallidos. Su correo ha sido bloqueado por 1 hora."
+                    )
+                
+                intentos_restantes = 5 - datos_otp["intentos_fallidos"]
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Código OTP incorrecto. Le quedan {intentos_restantes} intentos antes del bloqueo temporal."
+                )
+            else:
+                ALMACEN_OTP_TEMPORAL.pop(contacto_key, None)
         else:
             if otp_ingresado != "123456":
-                raise HTTPException(status_code=400, detail="No se encontró un código OTP activo. Solicítalo primero.")
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se encontró un código OTP activo o este ha expirado. Solicítalo primero."
+                )
 
         pdf_bytes = base64.b64decode(payload.archivo_base64)
         sha256_original = hashlib.sha256(pdf_bytes).hexdigest()
