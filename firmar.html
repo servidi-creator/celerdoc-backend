@@ -453,8 +453,6 @@
     }
     .success-title { font-size: 20px; font-weight: 700; color: #166534; margin-bottom: 8px; }
     .success-subtitle { font-size: 14px; color: #14532d; margin-bottom: 24px; }
-    
-    .download-countdown-box { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; display: inline-block; margin-bottom: 16px; }
 
     .btn-download { background: #15803d; color: #ffffff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; transition: background 0.2s; display: none; box-shadow: 0 4px 12px rgba(21, 128, 61, 0.2); }
     .btn-download:hover { background: #166534; }
@@ -646,24 +644,10 @@
       </div>
     </div>
 
-    <!-- PANEL DE ÉXITO ACTUALIZADO CON ENLACE PERMANENTE Y ADVERTENCIA UX -->
+    <!-- PANEL DE ÉXITO SIMPLIFICADO SIN EL ENLACE DE COPIA -->
     <div class="success-card" id="successPanel">
       <div class="success-title" id="txtSuccessTitle">¡Firma completada con éxito!</div>
       <div class="success-subtitle" id="txtSuccessSubtitle">Tu documento ha sido firmado con plena validez legal.</div>
-
-      <!-- CAJA DE ENLACE PERMANENTE DE DESCARGA -->
-      <div id="enlaceDescargaContainer" style="margin: 20px 0; background: #ffffff; border: 1px solid #86efac; border-radius: 8px; padding: 16px; text-align: left; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-        <label style="font-size: 11.5px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">
-          🔗 Enlace Permanente de Descarga y Auditoría:
-        </label>
-        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-          <input type="text" id="inputUrlDescarga" readonly style="flex: 1; min-width: 240px; background: #f8fafc; border: 1px solid #cbd5e1; color: #0f172a; padding: 8px 10px; border-radius: 6px; font-size: 12px; font-family: monospace; outline: none;" />
-          <button type="button" id="btnCopiarLink" style="background: #3366CC; color: #ffffff; border: none; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s; white-space: nowrap;">📋 Copiar Link</button>
-        </div>
-        <p style="font-size: 11.5px; color: #475569; margin: 8px 0 0 0; line-height: 1.4;">
-          ⚠️ <strong>Importante:</strong> Conserve este enlace en un lugar seguro. Le permitirá acceder, verificar y descargar su documento certificado en cualquier momento.
-        </p>
-      </div>
 
       <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 16px;">
         <button type="button" class="btn-download" id="btnDescargar" style="display: inline-block; background: #15803d; color: #ffffff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(21, 128, 61, 0.2);">📥 Descargar Nuevo PDF Firmado</button>
@@ -1820,12 +1804,6 @@
         }
 
         descargaUrlActual = `${API_URL}${data.datos_archivo.ruta_descarga}`;
-        
-        // Rellenar el input con el enlace permanente para el usuario
-        const inputUrlDescarga = document.getElementById('inputUrlDescarga');
-        if (inputUrlDescarga) {
-          inputUrlDescarga.value = descargaUrlActual;
-        }
 
         successPanel.style.display = 'block';
         successPanel.scrollIntoView({ behavior: 'smooth' });
@@ -1834,23 +1812,6 @@
         console.error("Error de conexión:", err);
         alert("Error de conexión con el servidor en " + API_URL + ": " + err.message);
       }
-    }
-
-    const btnCopiarLink = document.getElementById('btnCopiarLink');
-    if (btnCopiarLink) {
-      btnCopiarLink.addEventListener('click', () => {
-        const inputUrl = document.getElementById('inputUrlDescarga');
-        if (inputUrl && inputUrl.value) {
-          navigator.clipboard.writeText(inputUrl.value).then(() => {
-            btnCopiarLink.textContent = "✅ ¡Copiado!";
-            setTimeout(() => {
-              btnCopiarLink.textContent = "📋 Copiar Link";
-            }, 2500);
-          }).catch(err => {
-            console.error("Error al copiar al portapapeles:", err);
-          });
-        }
-      });
     }
 
     btnDescargar.addEventListener('click', () => {
