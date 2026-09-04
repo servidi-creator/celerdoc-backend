@@ -1348,7 +1348,7 @@
 
       modalSignaturePad.style.display = 'none';
 
-      // ENVIAR SOLICITUD DE OTP REAL AL SERVIDOR VÍA TWILIO O SIMULACIÓN
+      // SOLICITUD DE OTP REAL AL SERVIDOR CON GESTIÓN DE JSON Y ERRORES
       const emailDestino = inputEmail.value.trim();
       const nombreFirmante = inputNombre.value.trim();
       const tel = inputPhone.value.trim();
@@ -1361,13 +1361,14 @@
           body: JSON.stringify({ email: emailDestino, nombre_firmante: nombreFirmante })
         });
 
+        const resultadoOtp = await respOtp.json();
+
         if (!respOtp.ok) {
-          const errData = await respOtp.json();
-          alert("No se pudo enviar el código OTP: " + (errData.detail || "Error desconocido"));
+          alert("Aviso: " + (resultadoOtp.detail || resultadoOtp.mensaje || "Error al enviar OTP"));
           return;
         }
 
-        document.getElementById('otpDestinoMsg').innerHTML = `Código de seguridad enviado a: <strong>${ind} ${tel}</strong> / <strong>${emailDestino}</strong><br><br><span style="color: var(--brand-primary); font-weight: 600;">(Revisa tu consola o correo electrónico)</span>`;
+        document.getElementById('otpDestinoMsg').innerHTML = `Código de seguridad enviado a: <strong>${ind} ${tel}</strong> / <strong>${emailDestino}</strong><br><br><span style="color: var(--brand-primary); font-weight: 600;">(Vigencia de 10 minutos. Revisa tu correo o spam)</span>`;
         inputOtp.value = '';
         otpErrorMsg.textContent = '';
         modalOtp.style.display = 'flex';
@@ -1810,14 +1811,14 @@
           body: JSON.stringify(payload)
         });
 
+        const data = await resp.json();
+
         if (!resp.ok) {
-          const errText = await resp.text();
-          console.error("Error devuelto por el servidor:", errText);
-          alert("Error en el servidor al procesar la firma: " + errText);
+          console.error("Error devuelto por el servidor:", data);
+          alert("Error en el servidor al procesar la firma: " + (data.detail || "Error desconocido"));
           return;
         }
 
-        const data = await resp.json();
         descargaUrlActual = `${API_URL}${data.datos_archivo.ruta_descarga}`;
         
         // Rellenar el input con el enlace permanente para el usuario
