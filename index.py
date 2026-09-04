@@ -7,9 +7,7 @@ import hashlib
 import random
 from datetime import datetime, timezone
 import traceback
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -72,47 +70,54 @@ def simular_envio_correo_local(email_destino: str, asunto: str, cuerpo_html: str
 
 
 def enviar_correo_experiencia_uc(email_destino: str, nombre_firmante: str, nombre_archivo: str, url_descarga: str):
-    """Envía el correo real de éxito con el saludo de Experiencia UC usando SMTP nativo."""
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    """Envía el correo de entrega de documento firmado usando la API HTTP de Resend."""
+    resend_api_key = os.getenv("RESEND_API_KEY", "")
 
-    if not smtp_user or not smtp_password:
-        print("ℹ️ Credenciales SMTP no configuradas. El correo de Experiencia UC usará simulación local.")
+    if not resend_api_key:
+        print("ℹ️ RESEND_API_KEY no configurada. El correo usará simulación local.")
         return False
 
-    asunto = "✨ ¡Documento firmado con éxito! — Experiencia UC"
+    asunto = "¡Listo! Su documento ha sido firmado con éxito 🚀"
     
     cuerpo_html = f"""
-    <div style="font-family: Arial, sans-serif; color: #0f172a; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
-        <h2 style="color: #3366CC;">¡Hola, {nombre_firmante}! 👋</h2>
-        <p>Te damos la bienvenida a la <strong>Experiencia UC</strong>. Nos complace confirmarte que tu documento <strong>{nombre_archivo}</strong> ha sido firmado y certificado digitalmente con total validez y seguridad.</p>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; max-width: 580px; margin: 0 auto; padding: 28px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <h2 style="color: #1e3a8a; margin-top: 0; font-size: 20px;">¡Listo! Su documento ha sido firmado con éxito 🚀</h2>
+        <p style="font-size: 14px; line-height: 1.6; color: #334155;">Su trámite en CelerDoc ha finalizado perfectamente. Descargue su documento firmado de forma permanente a través del siguiente enlace:</p>
         
-        <div style="text-align: center; margin: 32px 0;">
-            <a href="{url_descarga}" style="background-color: #3366CC; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">📥 Descargar mi documento firmado</a>
+        <div style="text-align: center; margin: 28px 0;">
+            <a href="{url_descarga}" style="background-color: #2563eb; color: #ffffff; padding: 12px 26px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">Descargar Documento Firmado</a>
         </div>
         
-        <p style="font-size: 13px; color: #64748b; text-align: center;">Este enlace es seguro y permanente. Gracias por confiar en nosotros para simplificar tus trámites.</p>
+        <p style="font-size: 13px; color: #64748b; line-height: 1.5; word-break: break-all;">Enlace directo: <a href="{url_descarga}" style="color: #2563eb; text-decoration: underline;">{url_descarga}</a></p>
+        <p style="font-size: 14px; color: #334155; margin-bottom: 0;">¡Gracias por elegirnos!</p>
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0 16px 0;">
+        <p style="font-size: 12px; color: #94a3b8; margin: 0;">El equipo de CelerDoc</p>
     </div>
     """
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = asunto
-        msg["From"] = smtp_user
-        msg["To"] = email_destino
-        msg.attach(MIMEText(cuerpo_html, "html"))
+    headers = {
+        "Authorization": f"Bearer {resend_api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "from": "Celerdoc <onboarding@resend.dev>",
+        "to": [email_destino],
+        "subject": asunto,
+        "html": cuerpo_html
+    }
 
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_user, email_destino, msg.as_string())
-            
-        print(f"✓ Correo Experiencia UC enviado exitosamente por SMTP a {email_destino}")
-        return True
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.post("https://api.resend.com/emails", json=payload, headers=headers)
+            if response.status_code in [200, 201]:
+                print(f"✓ Correo de entrega enviado exitosamente por Resend API a {email_destino}")
+                return True
+            else:
+                print(f"❌ Error en respuesta de Resend API ({response.status_code}): {response.text}")
+                return False
     except Exception as e:
-        print(f"❌ Error al enviar correo SMTP: {e}")
+        print(f"❌ Error al conectar con Resend API: {e}")
         return False
 
 
@@ -521,7 +526,7 @@ def estampar_pkcs7_en_pagina(pagina, pkcs7_info: dict):
 # FUNCIONES DE ENMASCARAMIENTO EXCLUSIVAS PARA REPORTE DE AUDITORIA Y TRAZABILIDAD
 # =========================================================================
 def enmascarar_ip_reporte(ip_str: str) -> str:
-    """Enmascara la IP conservando el primer número visible, puntos y los dois últimos números visibles."""
+    """Enmascara la IP conservando el primer número visible, puntos y los dos últimos números visibles."""
     if not ip_str or "." not in str(ip_str):
         return ip_str or "No disponible"
     
@@ -859,7 +864,7 @@ def generar_pdf_firmado_y_guardar(
     if email_notificacion:
         enlace_descarga_url = f"{BASE_URL_PUBLICO}/descargas/{nombre_final}"
         
-        # Intentar enviar el correo real de Experiencia UC por SMTP
+        # Enviar correo real usando la API HTTP de Resend
         enviado_real = enviar_correo_experiencia_uc(
             email_destino=email_notificacion,
             nombre_firmante=nombre_firmante,
@@ -867,10 +872,10 @@ def generar_pdf_firmado_y_guardar(
             url_descarga=enlace_descarga_url
         )
         
-        # Respaldo si no hay SMTP configurado
+        # Respaldo de consola si falla Resend
         if not enviado_real:
-            asunto_fin = "📄 ¡Tu documento ha sido firmado y certificado con éxito! — Celerdoc"
-            cuerpo_fin = f"Enlace de descarga: {enlace_descarga_url}"
+            asunto_fin = "¡Listo! Su documento ha sido firmado con éxito 🚀"
+            cuerpo_fin = f"Su trámite en CelerDoc ha finalizado perfectamente. Descargue su documento firmado de forma permanente aquí: {enlace_descarga_url}\n\n¡Gracias por elegirnos!\nEl equipo de CelerDoc"
             simular_envio_correo_local(email_notificacion, asunto_fin, cuerpo_fin, codigo_otp="N/A")
 
 
